@@ -36,6 +36,7 @@
       <div class="flex gap-2 text-xs">
         <button onclick="novo()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold px-3 py-2 rounded-lg">+ Novo atleta</button>
         <label class="cursor-pointer bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Importar planilha<input type="file" accept=".xlsx,.xls" class="hidden" onchange="lerPlanilha(event)"></label>
+        <label class="cursor-pointer bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Importar ranking<input type="file" accept=".xlsx,.xls" class="hidden" onchange="lerRanking(event)"></label>
         <button onclick="sair()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3 py-2 rounded-lg">Sair</button>
       </div>
     </div>
@@ -101,6 +102,22 @@
       <div class="flex justify-end gap-2">
         <button onclick="document.getElementById('modalImp').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Cancelar</button>
         <button id="btnConfImp" onclick="confirmarImport()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Confirmar importação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORTAR RANKING -->
+  <div id="modalImpRank" class="hidden fixed inset-0 bg-black/70 z-40 overflow-y-auto p-4">
+    <div class="max-w-xl mx-auto bg-gray-900 border border-gray-700 rounded-2xl p-5 mt-10">
+      <h2 class="text-white font-bold mb-2">Importar ranking individual</h2>
+      <div class="mb-3">
+        <label class="lbl">Data de atualização do ranking</label>
+        <input id="f_rankData" type="date" class="inp" style="max-width:200px">
+      </div>
+      <div id="resumoImpRank" class="text-xs text-gray-300 space-y-1 mb-4"></div>
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modalImpRank').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Cancelar</button>
+        <button id="btnConfImpRank" onclick="confirmarImportRanking()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Confirmar importação</button>
       </div>
     </div>
   </div>
@@ -297,6 +314,68 @@
       }
       $('modalImp').classList.add('hidden');
       $('aviso').textContent = importPend.length + ' linhas importadas.';
+      await carregar();
+    }
+
+    // ---- importar ranking individual ----
+    function normNome(s) {
+      return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
+    }
+    let pendRanking = null;
+    async function lerRanking(ev) {
+      const f = ev.target.files[0]; ev.target.value = '';
+      if (!f) return;
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      const wsAtletas = wb.Sheets['Atletas'], wsCadastro = wb.Sheets['Cadastro'];
+      if (!wsAtletas || !wsCadastro) { alert('A planilha precisa ter as abas "Atletas" e "Cadastro" (exportação padrão do painel de ranqueamento).'); return; }
+      const cad = XLSX.utils.sheet_to_json(wsCadastro, { defval: null });
+      const nomeParaReg = new Map();
+      cad.forEach(l => { const reg = parseInt(l['Registro'], 10); if (!isNaN(reg) && l['Nome']) nomeParaReg.set(normNome(l['Nome']), reg); });
+      const linhas = XLSX.utils.sheet_to_json(wsAtletas, { defval: null });
+      const porReg = new Map(atletas.filter(a => a.registro != null).map(a => [a.registro, a]));
+      const payload = [], semCorrespCadastro = [], naoCadastradosNoPortal = [];
+      linhas.forEach(l => {
+        const nome = l['Atleta']; if (!nome) return;
+        const reg = nomeParaReg.get(normNome(nome));
+        if (reg == null) { semCorrespCadastro.push(nome); return; }
+        if (!porReg.has(reg)) { naoCadastradosNoPortal.push(`${nome} (reg. ${reg})`); return; }
+        payload.push({
+          registro: reg,
+          ranking_pos: parseInt(l['Pos.'], 10) || null,
+          ranking_pontos: parseInt(l['Pontos'], 10) || 0,
+          ranking_ouro: parseInt(l['Ouro'], 10) || 0,
+          ranking_prata: parseInt(l['Prata'], 10) || 0,
+          ranking_bronze: parseInt(l['Bronze'], 10) || 0,
+          ranking_quarto: parseInt(l['4º'], 10) || 0,
+          ranking_eventos: l['Eventos'] || null,
+          ranking_modalidades: l['Modalidades'] || null
+        });
+      });
+      pendRanking = payload;
+      const lista = (t, arr) => `<p><b>${arr.length}</b> ${t}${arr.length ? ': <span class="text-gray-400">' + arr.slice(0, 6).join('; ') + (arr.length > 6 ? '…' : '') + '</span>' : ''}</p>`;
+      $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado', payload.map(p => p.registro)) +
+        lista('nome(s) da planilha sem correspondência na aba "Cadastro" (não foram importados)', semCorrespCadastro) +
+        lista('atleta(s) com ranking mas ainda não cadastrados no Portal Ficast (não foram importados)', naoCadastradosNoPortal) +
+        '<p class="text-amber-300 pt-2">Atenção: todos os demais atletas (que não aparecem na planilha) terão o ranking individual limpo/zerado nesta importação.</p>';
+      $('f_rankData').value = new Date().toISOString().slice(0, 10);
+      $('btnConfImpRank').disabled = !payload.length;
+      $('modalImpRank').classList.remove('hidden');
+    }
+    async function confirmarImportRanking() {
+      const data = $('f_rankData').value || new Date().toISOString().slice(0, 10);
+      $('btnConfImpRank').disabled = true;
+      const limpar = await sb.from('atletas').update({
+        ranking_pos: null, ranking_pontos: null, ranking_ouro: null, ranking_prata: null,
+        ranking_bronze: null, ranking_quarto: null, ranking_eventos: null, ranking_modalidades: null, ranking_atualizado_em: null
+      }).gt('id', 0);
+      if (limpar.error) { alert('Erro ao limpar ranking anterior: ' + limpar.error.message); $('btnConfImpRank').disabled = false; return; }
+      const linhas = pendRanking.map(p => ({ ...p, ranking_atualizado_em: data }));
+      for (let i = 0; i < linhas.length; i += 100) {
+        const { error } = await sb.from('atletas').upsert(linhas.slice(i, i + 100), { onConflict: 'registro' });
+        if (error) { alert('Erro na importação do ranking: ' + error.message); $('btnConfImpRank').disabled = false; return; }
+      }
+      $('modalImpRank').classList.add('hidden');
+      $('aviso').textContent = linhas.length + ' atleta(s) com ranking atualizado em ' + data.split('-').reverse().join('/') + '.';
       await carregar();
     }
 
