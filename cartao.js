@@ -36,6 +36,23 @@ function ajustarTextoCartao(el, larguraMax) {
   const lim = larguraMax || el.clientWidth;
   while (el.scrollWidth > lim + 0.5 && tam > 6) { tam -= 0.5; el.style.fontSize = tam + 'px'; }
 }
+// Mostra o QR Code em tela cheia, grande, para facilitar a leitura pela camera de outro celular.
+function ampliarQR(url) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;cursor:zoom-out;';
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'background:#fff;padding:20px;';
+  ov.appendChild(caixa);
+  const tam = Math.max(148, Math.min(444, Math.floor((Math.min(window.innerWidth, window.innerHeight) - 120) / 37) * 37));
+  new QRCode(caixa, { text: url, width: tam, height: tam, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+  const t = document.createElement('div');
+  t.style.cssText = 'color:#111;font:600 14px Montserrat,sans-serif;text-align:center;';
+  t.textContent = 'Aponte a câmera para o QR Code. Toque na tela para fechar.';
+  ov.appendChild(t);
+  ov.onclick = () => ov.remove();
+  document.body.appendChild(ov);
+}
+
 function ajustarTodosTextos() {
   ['cardNome', 'cardGrad', 'cardEstilo', 'cardEntidade', 'cardCNKB'].forEach(id => ajustarTextoCartao(document.getElementById(id)));
   const cg = document.getElementById('cardCargo');
@@ -151,7 +168,10 @@ function renderizarCartao(atleta) {
   const qr = $('qrcode');
   qr.innerHTML = '';
   const urlValidacao = new URL('validar.html', window.location.href).href + '?t=' + atleta.tok;
-  new QRCode(qr, { text: urlValidacao, width: 70, height: 70, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  new QRCode(qr, { text: urlValidacao, width: 111, height: 111, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+  qr.parentElement.style.cursor = 'zoom-in';
+  qr.parentElement.title = 'Toque para ampliar';
+  qr.parentElement.onclick = () => ampliarQR(urlValidacao);
   ajustarEscalaCartoes();
   ajustarTodosTextos();
 }

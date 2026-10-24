@@ -67,7 +67,7 @@
   .v-topo span:last-child { font-family:ui-monospace,Menlo,monospace; font-size:8px; font-weight:700; color:#bcd9ff; }
   .v-corpo { padding:8px 20px 4px; display:flex; flex-direction:column; gap:8px; flex:1; justify-content:center; }
   .v-lin { display:flex; align-items:center; gap:14px; }
-  .qrb { background:#fff; padding:7px; border-radius:12px; border:2px solid var(--qb,#9fd3ff); box-shadow:0 2px 8px rgba(0,0,0,.35); flex-shrink:0; }
+  .qrb { background:#fff; padding:12px; border-radius:12px; border:2px solid var(--qb,#9fd3ff); box-shadow:0 2px 8px rgba(0,0,0,.35); flex-shrink:0; }
   .v-txt p { font-size:8px; font-weight:700; line-height:1.35; margin:0 0 5px; }
   .v-leg { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3); border-radius:6px; padding:6px 8px; font-size:7.4px; line-height:1.45; color:#e4efff; }
   .v-leg b { color:#fff; } .v-leg em { display:block; margin-top:3px; font-style:normal; font-weight:700; color:#fff; }
