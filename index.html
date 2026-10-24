@@ -59,7 +59,9 @@
     </div>
     <div id="rankingBox" class="hidden w-full max-w-xl bg-gray-900/80 border border-gray-800 rounded-xl p-4 text-sm text-center mb-6">
       <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Ranking individual FIKARJ 2026</p>
+      <p id="rankingTextoGeralMisto" class="hidden text-white font-bold"></p>
       <p id="rankingTextoGeral" class="hidden text-white font-bold"></p>
+      <p id="rankingTextoAssocMisto" class="hidden text-white font-bold"></p>
       <p id="rankingTextoAssoc" class="hidden text-white font-bold"></p>
       <p id="rankingMedalhas" class="text-gray-400 text-xs mt-1"></p>
     </div>
@@ -106,18 +108,33 @@
       document.getElementById('telaCartao').classList.remove('hidden');
       document.getElementById('saudacao').textContent = linha.nome;
       const rb = document.getElementById('rankingBox');
+      const txtGeralMisto = document.getElementById('rankingTextoGeralMisto');
       const txtGeral = document.getElementById('rankingTextoGeral');
+      const txtAssocMisto = document.getElementById('rankingTextoAssocMisto');
       const txtAssoc = document.getElementById('rankingTextoAssoc');
-      if (linha.sexo && (linha.ranking_pos || linha.ranking_pos_assoc)) {
+      const temRanking = linha.ranking_pos_geral || linha.ranking_pos || linha.ranking_pos_assoc_geral || linha.ranking_pos_assoc;
+      if (temRanking) {
         const categoria = linha.sexo === 'F' ? 'feminino' : 'masculino';
         rb.classList.remove('hidden');
-        if (linha.ranking_pos) {
+        if (linha.ranking_pos_geral) {
+          txtGeralMisto.classList.remove('hidden');
+          txtGeralMisto.textContent = linha.ranking_pos_geral + 'º lugar no ranking geral FIKARJ · ' + linha.ranking_pontos + ' pontos';
+        } else {
+          txtGeralMisto.classList.add('hidden');
+        }
+        if (linha.sexo && linha.ranking_pos) {
           txtGeral.classList.remove('hidden');
           txtGeral.textContent = linha.ranking_pos + 'º lugar no ranking geral ' + categoria + ' · ' + linha.ranking_pontos + ' pontos';
         } else {
           txtGeral.classList.add('hidden');
         }
-        if (linha.ranking_pos_assoc) {
+        if (linha.ranking_pos_assoc_geral) {
+          txtAssocMisto.classList.remove('hidden');
+          txtAssocMisto.textContent = linha.ranking_pos_assoc_geral + 'º lugar no ranking geral da sua associação';
+        } else {
+          txtAssocMisto.classList.add('hidden');
+        }
+        if (linha.sexo && linha.ranking_pos_assoc) {
           txtAssoc.classList.remove('hidden');
           txtAssoc.textContent = linha.ranking_pos_assoc + 'º lugar no ranking ' + categoria + ' da sua associação';
         } else {
