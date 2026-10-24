@@ -57,6 +57,11 @@
         <button onclick="sair()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-4 py-2.5 rounded-xl text-sm">Sair</button>
       </div>
     </div>
+    <div id="rankingBox" class="hidden w-full max-w-xl bg-gray-900/80 border border-gray-800 rounded-xl p-4 text-sm text-center mb-6">
+      <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Ranking individual FIKARJ 2026</p>
+      <p id="rankingTexto" class="text-white font-bold"></p>
+      <p id="rankingMedalhas" class="text-gray-400 text-xs mt-1"></p>
+    </div>
     <div id="avisoInativo" class="hidden w-full max-w-xl bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-4 text-sm text-center mb-6"></div>
     <div id="cartaoMount"></div>
   </section>
@@ -99,6 +104,14 @@
       document.getElementById('telaLogin').classList.add('hidden');
       document.getElementById('telaCartao').classList.remove('hidden');
       document.getElementById('saudacao').textContent = linha.nome;
+      const rb = document.getElementById('rankingBox');
+      if (linha.ranking_pos) {
+        rb.classList.remove('hidden');
+        document.getElementById('rankingTexto').textContent = linha.ranking_pos + 'º lugar no ranking individual · ' + linha.ranking_pontos + ' pontos';
+        document.getElementById('rankingMedalhas').textContent = '🥇 ' + (linha.ranking_ouro || 0) + '   🥈 ' + (linha.ranking_prata || 0) + '   🥉 ' + (linha.ranking_bronze || 0) + (linha.ranking_atualizado_em ? '  ·  atualizado em ' + linha.ranking_atualizado_em.split('-').reverse().join('/') : '');
+      } else {
+        rb.classList.add('hidden');
+      }
       const ativo = atletaAtivo(linha);
       document.getElementById('btnPDF').classList.toggle('hidden', !ativo);
       const aviso = document.getElementById('avisoInativo');
