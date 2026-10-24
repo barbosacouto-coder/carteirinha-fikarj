@@ -132,7 +132,9 @@
       <div class="flex justify-end mb-2"><button onclick="document.getElementById('modalCartao').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Fechar</button></div>
       <div id="rankingAdmin" class="hidden max-w-xl mx-auto bg-gray-900/90 border border-gray-800 rounded-xl p-4 text-sm text-center mb-4">
         <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Ranking individual FIKARJ 2026</p>
+        <p id="rankingAdminGeralMisto" class="hidden text-white font-bold"></p>
         <p id="rankingAdminGeral" class="hidden text-white font-bold"></p>
+        <p id="rankingAdminAssocMisto" class="hidden text-white font-bold"></p>
         <p id="rankingAdminAssoc" class="hidden text-white font-bold"></p>
         <p id="rankingAdminMedalhas" class="text-gray-400 text-xs mt-1"></p>
       </div>
@@ -259,27 +261,40 @@
       return linhaParaAtleta({ ...a, associacao_nome: mapNome()[a.associacao] });
     }
     function mostrarRankingAdmin(a) {
-      const rb = $('rankingAdmin'), txtGeral = $('rankingAdminGeral'), txtAssoc = $('rankingAdminAssoc'), aviso = $('rankingAdminAviso');
-      if (!a.sexo) {
+      const rb = $('rankingAdmin'), txtGeralMisto = $('rankingAdminGeralMisto'), txtGeral = $('rankingAdminGeral'), txtAssocMisto = $('rankingAdminAssocMisto'), txtAssoc = $('rankingAdminAssoc'), aviso = $('rankingAdminAviso');
+      const temRanking = a.ranking_pos_geral || a.ranking_pos || a.ranking_pos_assoc_geral || a.ranking_pos_assoc;
+      if (!temRanking) {
         rb.classList.add('hidden');
-        aviso.classList.remove('hidden');
-        aviso.textContent = 'Este atleta ainda não tem sexo cadastrado — por isso a posição no ranking não aparece na carteirinha dele até você preencher o campo "Sexo" acima.';
+        aviso.classList.add('hidden');
         return;
       }
-      aviso.classList.add('hidden');
-      if (!a.ranking_pos && !a.ranking_pos_assoc) {
-        rb.classList.add('hidden');
-        return;
+      if (!a.sexo) {
+        aviso.classList.remove('hidden');
+        aviso.textContent = 'Este atleta ainda não tem sexo cadastrado — por isso as posições por sexo não aparecem na carteirinha dele até você preencher o campo "Sexo" acima.';
+      } else {
+        aviso.classList.add('hidden');
       }
       const categoria = a.sexo === 'F' ? 'feminino' : 'masculino';
       rb.classList.remove('hidden');
-      if (a.ranking_pos) {
+      if (a.ranking_pos_geral) {
+        txtGeralMisto.classList.remove('hidden');
+        txtGeralMisto.textContent = a.ranking_pos_geral + 'º lugar no ranking geral FIKARJ · ' + a.ranking_pontos + ' pontos';
+      } else {
+        txtGeralMisto.classList.add('hidden');
+      }
+      if (a.sexo && a.ranking_pos) {
         txtGeral.classList.remove('hidden');
         txtGeral.textContent = a.ranking_pos + 'º lugar no ranking geral ' + categoria + ' · ' + a.ranking_pontos + ' pontos';
       } else {
         txtGeral.classList.add('hidden');
       }
-      if (a.ranking_pos_assoc) {
+      if (a.ranking_pos_assoc_geral) {
+        txtAssocMisto.classList.remove('hidden');
+        txtAssocMisto.textContent = a.ranking_pos_assoc_geral + 'º lugar no ranking geral da associação ' + (a.associacao || '');
+      } else {
+        txtAssocMisto.classList.add('hidden');
+      }
+      if (a.sexo && a.ranking_pos_assoc) {
         txtAssoc.classList.remove('hidden');
         txtAssoc.textContent = a.ranking_pos_assoc + 'º lugar no ranking ' + categoria + ' da associação ' + (a.associacao || '');
       } else {
@@ -402,11 +417,18 @@
       });
       // regra de desempate do guia: pontos, ouros, pratas, bronzes, nome
       const desempate = (a, b) => b.ranking_pontos - a.ranking_pontos || b.ranking_ouro - a.ranking_ouro || b.ranking_prata - a.ranking_prata || b.ranking_bronze - a.ranking_bronze || a.nome.localeCompare(b.nome);
-      // ranking geral masculino/feminino: só entre quem tem sexo cadastrado, separado por sexo
+      // 1. ranking geral FIKARJ misto: todos os atletas (ambos os sexos) com anuidade em dia
+      brutos.slice().sort(desempate).forEach((p, i) => { p.ranking_pos_geral = i + 1; });
+      // 2. ranking geral masculino/feminino: só entre quem tem sexo cadastrado, separado por sexo
       ['M', 'F'].forEach(sx => {
         brutos.filter(p => p.sexo === sx).sort(desempate).forEach((p, i) => { p.ranking_pos = i + 1; });
       });
-      // ranking masculino/feminino por associação: mesma separação, dentro de cada associação
+      // 3. ranking geral da associação (misto): todos os atletas da associação, ambos os sexos juntos
+      const assocs2 = new Set(brutos.filter(p => p.associacao).map(p => p.associacao));
+      assocs2.forEach(as => {
+        brutos.filter(p => p.associacao === as).sort(desempate).forEach((p, i) => { p.ranking_pos_assoc_geral = i + 1; });
+      });
+      // 4. ranking masculino/feminino por associação: mesma separação, dentro de cada associação
       const chaves = new Set(brutos.filter(p => p.sexo && p.associacao).map(p => p.sexo + '|' + p.associacao));
       chaves.forEach(ch => {
         const [sx, as] = ch.split('|');
@@ -414,11 +436,11 @@
       });
       const payload = brutos.map(p => {
         const { nome, sexo, associacao, ...resto } = p;
-        return { ...resto, ranking_pos: p.ranking_pos || null, ranking_pos_assoc: p.ranking_pos_assoc || null };
+        return { ...resto, ranking_pos_geral: p.ranking_pos_geral || null, ranking_pos: p.ranking_pos || null, ranking_pos_assoc_geral: p.ranking_pos_assoc_geral || null, ranking_pos_assoc: p.ranking_pos_assoc || null };
       });
       pendRanking = payload;
       const lista = (t, arr) => `<p><b>${arr.length}</b> ${t}${arr.length ? ': <span class="text-gray-400">' + arr.slice(0, 6).join('; ') + (arr.length > 6 ? '…' : '') + '</span>' : ''}</p>`;
-      $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado (posições geral e por associação, calculadas separadamente por sexo, só entre quem está com anuidade em dia)', payload.map(p => p.registro)) +
+      $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado (4 posições: geral FIKARJ, geral por sexo, geral da associação e por sexo na associação, só entre quem está com anuidade em dia)', payload.map(p => p.registro)) +
         lista('nome(s) da planilha sem correspondência na aba "Cadastro" (não foram importados)', semCorrespCadastro) +
         lista('atleta(s) com ranking mas ainda não cadastrados no Portal Ficast (não foram importados)', naoCadastradosNoPortal) +
         lista('atleta(s) com pódio mas anuidade inativa (não entram no ranking individual)', inativosExcluidos) +
@@ -432,7 +454,7 @@
       const data = $('f_rankData').value || new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = true;
       const limpar = await sb.from('atletas').update({
-        ranking_pos: null, ranking_pos_assoc: null, ranking_pontos: null, ranking_ouro: null, ranking_prata: null,
+        ranking_pos_geral: null, ranking_pos: null, ranking_pos_assoc_geral: null, ranking_pos_assoc: null, ranking_pontos: null, ranking_ouro: null, ranking_prata: null,
         ranking_bronze: null, ranking_quarto: null, ranking_eventos: null, ranking_modalidades: null, ranking_atualizado_em: null
       }).gt('id', 0);
       if (limpar.error) { alert('Erro ao limpar ranking anterior: ' + limpar.error.message); $('btnConfImpRank').disabled = false; return; }
