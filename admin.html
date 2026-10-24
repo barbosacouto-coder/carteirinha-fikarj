@@ -333,15 +333,16 @@
       cad.forEach(l => { const reg = parseInt(l['Registro'], 10); if (!isNaN(reg) && l['Nome']) nomeParaReg.set(normNome(l['Nome']), reg); });
       const linhas = XLSX.utils.sheet_to_json(wsAtletas, { defval: null });
       const porReg = new Map(atletas.filter(a => a.registro != null).map(a => [a.registro, a]));
-      const payload = [], semCorrespCadastro = [], naoCadastradosNoPortal = [];
+      const brutos = [], semCorrespCadastro = [], naoCadastradosNoPortal = [], inativosExcluidos = [];
       linhas.forEach(l => {
         const nome = l['Atleta']; if (!nome) return;
         const reg = nomeParaReg.get(normNome(nome));
         if (reg == null) { semCorrespCadastro.push(nome); return; }
-        if (!porReg.has(reg)) { naoCadastradosNoPortal.push(`${nome} (reg. ${reg})`); return; }
-        payload.push({
-          registro: reg,
-          ranking_pos: parseInt(l['Pos.'], 10) || null,
+        const at = porReg.get(reg);
+        if (!at) { naoCadastradosNoPortal.push(`${nome} (reg. ${reg})`); return; }
+        if (!ativo(at)) { inativosExcluidos.push(`${nome} (reg. ${reg})`); return; }
+        brutos.push({
+          registro: reg, nome,
           ranking_pontos: parseInt(l['Pontos'], 10) || 0,
           ranking_ouro: parseInt(l['Ouro'], 10) || 0,
           ranking_prata: parseInt(l['Prata'], 10) || 0,
@@ -351,12 +352,16 @@
           ranking_modalidades: l['Modalidades'] || null
         });
       });
+      // recalcula a posição só entre quem está com anuidade em dia (regra de desempate do guia: pontos, ouros, pratas, bronzes, nome)
+      brutos.sort((a, b) => b.ranking_pontos - a.ranking_pontos || b.ranking_ouro - a.ranking_ouro || b.ranking_prata - a.ranking_prata || b.ranking_bronze - a.ranking_bronze || a.nome.localeCompare(b.nome));
+      const payload = brutos.map((p, i) => { const { nome, ...resto } = p; return { ...resto, ranking_pos: i + 1 }; });
       pendRanking = payload;
       const lista = (t, arr) => `<p><b>${arr.length}</b> ${t}${arr.length ? ': <span class="text-gray-400">' + arr.slice(0, 6).join('; ') + (arr.length > 6 ? '…' : '') + '</span>' : ''}</p>`;
-      $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado', payload.map(p => p.registro)) +
+      $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado (posição recalculada só entre quem está com anuidade em dia)', payload.map(p => p.registro)) +
         lista('nome(s) da planilha sem correspondência na aba "Cadastro" (não foram importados)', semCorrespCadastro) +
         lista('atleta(s) com ranking mas ainda não cadastrados no Portal Ficast (não foram importados)', naoCadastradosNoPortal) +
-        '<p class="text-amber-300 pt-2">Atenção: todos os demais atletas (que não aparecem na planilha) terão o ranking individual limpo/zerado nesta importação.</p>';
+        lista('atleta(s) com pódio mas anuidade inativa (não entram no ranking individual)', inativosExcluidos) +
+        '<p class="text-amber-300 pt-2">Atenção: todos os demais atletas (que não aparecem na planilha, ou cuja anuidade não está em dia) terão o ranking individual limpo/zerado nesta importação.</p>';
       $('f_rankData').value = new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = !payload.length;
       $('modalImpRank').classList.remove('hidden');
