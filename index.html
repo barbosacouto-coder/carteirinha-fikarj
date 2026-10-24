@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FIKARJ - Minha Carteirinha</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="cartao.css">
+</head>
+<body class="min-h-screen py-8 px-4 flex flex-col items-center">
+
+  <header class="text-center max-w-3xl mb-6">
+    <div class="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 text-sky-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider mb-3">
+      <span>🥋</span> Área do Filiado • FIKARJ
+    </div>
+    <h1 class="text-2xl md:text-3xl font-extrabold text-white font-cinzel tracking-tight leading-tight">
+      FEDERAÇÃO INTERESTILOS DE KARATÊ DO ESTADO DO RIO DE JANEIRO
+    </h1>
+    <p class="text-gray-400 text-xs md:text-sm mt-1">Consulte e baixe a sua carteirinha oficial</p>
+  </header>
+
+  <!-- LOGIN -->
+  <section id="telaLogin" class="w-full max-w-md bg-gray-900/90 border border-gray-800 rounded-2xl p-6 shadow-2xl">
+    <h2 class="text-white font-bold text-lg mb-1">Acessar minha carteirinha</h2>
+    <p class="text-gray-400 text-xs mb-4">Informe o seu CPF e a sua data de nascimento.</p>
+    <form id="formLogin" class="space-y-4" autocomplete="off">
+      <div>
+        <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">CPF</label>
+        <input id="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required
+               class="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-sky-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Data de nascimento</label>
+        <input id="nasc" type="date" required
+               class="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-sky-500">
+      </div>
+      <button id="btnEntrar" type="submit" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold px-4 py-3 rounded-xl text-sm transition">Entrar</button>
+      <p id="msg" class="text-xs min-h-[1rem]"></p>
+    </form>
+  </section>
+
+  <!-- CARTEIRINHA -->
+  <section id="telaCartao" class="hidden w-full flex flex-col items-center">
+    <div class="w-full max-w-4xl flex flex-col md:flex-row gap-3 items-center justify-between mb-6">
+      <div>
+        <p class="text-xs text-gray-400">Filiado</p>
+        <p id="saudacao" class="text-white font-bold"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnPDF" onclick="baixar()" class="bg-gradient-to-r from-red-600 via-green-600 to-sky-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm shadow-lg">Baixar Carteirinha (PDF)</button>
+        <button onclick="sair()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-4 py-2.5 rounded-xl text-sm">Sair</button>
+      </div>
+    </div>
+    <div id="avisoInativo" class="hidden w-full max-w-xl bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-4 text-sm text-center mb-6"></div>
+    <div id="cartaoMount"></div>
+  </section>
+
+  <script src="config.js"></script>
+  <script src="cartao.js"></script>
+  <script>
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+    montarCartao('cartaoMount');
+    let atual = null;
+
+    const cpfEl = document.getElementById('cpf');
+    cpfEl.addEventListener('input', () => {
+      const d = cpfEl.value.replace(/\D/g, '').slice(0, 11);
+      cpfEl.value = d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    });
+
+    function mensagem(txt, erro) {
+      const m = document.getElementById('msg');
+      m.textContent = txt;
+      m.className = 'text-xs min-h-[1rem] ' + (erro ? 'text-red-400' : 'text-sky-400');
+    }
+
+    document.getElementById('formLogin').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('btnEntrar');
+      btn.disabled = true; mensagem('Verificando...', false);
+      const { data, error } = await sb.rpc('login_atleta', { p_cpf: cpfEl.value, p_nasc: document.getElementById('nasc').value });
+      btn.disabled = false;
+      if (error) {
+        mensagem(/muitas_tentativas/.test(error.message) ? 'Muitas tentativas. Aguarde 15 minutos e tente novamente.' : 'Não foi possível consultar agora. Tente novamente.', true);
+        return;
+      }
+      if (!data) { mensagem('CPF ou data de nascimento não conferem com o cadastro.', true); return; }
+      mostrar(data);
+    });
+
+    function mostrar(linha) {
+      atual = linhaParaAtleta(linha);
+      document.getElementById('telaLogin').classList.add('hidden');
+      document.getElementById('telaCartao').classList.remove('hidden');
+      document.getElementById('saudacao').textContent = linha.nome;
+      const ativo = atletaAtivo(linha);
+      document.getElementById('btnPDF').classList.toggle('hidden', !ativo);
+      const aviso = document.getElementById('avisoInativo');
+      aviso.classList.toggle('hidden', ativo);
+      aviso.textContent = 'Sua anuidade consta como inativa. Procure a sua associação ou a FIKARJ para regularizar e emitir a carteirinha.';
+      document.getElementById('cartaoMount').classList.toggle('hidden', !ativo);
+      if (ativo) renderizarCartao(atual);
+    }
+
+    async function baixar() {
+      const btn = document.getElementById('btnPDF');
+      btn.disabled = true;
+      await gerarPDFCartoes([atual], 'Carteirinha_FIKARJ_' + atual.n.replace(/\s+/g, '_') + '.pdf');
+      btn.disabled = false;
+    }
+
+    function sair() {
+      atual = null;
+      document.getElementById('formLogin').reset();
+      mensagem('', false);
+      document.getElementById('telaCartao').classList.add('hidden');
+      document.getElementById('telaLogin').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>

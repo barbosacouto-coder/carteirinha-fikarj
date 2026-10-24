@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FIKARJ - Painel da Federação</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="cartao.css">
+  <style>.inp{width:100%;background:#030712;border:1px solid #374151;border-radius:.6rem;padding:.55rem .75rem;color:#fff;font-size:.8rem}.inp:focus{outline:none;border-color:#0ea5e9}.lbl{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:.25rem}</style>
+</head>
+<body class="min-h-screen py-6 px-4">
+
+  <!-- LOGIN -->
+  <section id="telaLogin" class="max-w-sm mx-auto mt-16 bg-gray-900/90 border border-gray-800 rounded-2xl p-6 shadow-2xl">
+    <h1 class="text-white font-cinzel font-extrabold text-lg mb-1">Painel da Federação</h1>
+    <p class="text-gray-400 text-xs mb-4">Acesso restrito à diretoria da FIKARJ.</p>
+    <form id="formLogin" class="space-y-3">
+      <div><label class="lbl">E-mail</label><input id="email" type="email" required class="inp" autocomplete="username"></div>
+      <div><label class="lbl">Senha</label><input id="senha" type="password" required class="inp" autocomplete="current-password"></div>
+      <button class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2.5 rounded-xl text-sm">Entrar</button>
+      <p id="msgLogin" class="text-xs text-red-400 min-h-[1rem]"></p>
+    </form>
+  </section>
+
+  <!-- PAINEL -->
+  <section id="telaPainel" class="hidden max-w-6xl mx-auto">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <h1 class="text-white font-cinzel font-extrabold text-lg">Painel da Federação · FIKARJ</h1>
+      <div class="flex gap-2 text-xs">
+        <button onclick="novo()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold px-3 py-2 rounded-lg">+ Novo atleta</button>
+        <label class="cursor-pointer bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Importar planilha<input type="file" accept=".xlsx,.xls" class="hidden" onchange="lerPlanilha(event)"></label>
+        <button onclick="sair()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3 py-2 rounded-lg">Sair</button>
+      </div>
+    </div>
+
+    <div id="stats" class="text-[11px] text-gray-400 mb-3"></div>
+
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3">
+      <input id="busca" oninput="filtrar()" placeholder="Buscar por nome, registro ou CPF" class="inp md:col-span-5">
+      <select id="fAssoc" onchange="filtrar()" class="inp md:col-span-3"></select>
+      <select id="fStatus" onchange="filtrar()" class="inp md:col-span-2">
+        <option value="">Todos os status</option><option value="ativo">Ativos</option><option value="inativo">Inativos</option>
+      </select>
+      <button id="btnLote" onclick="lote()" class="md:col-span-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-2 py-2">PDF em lote (ativos)</button>
+    </div>
+    <p id="aviso" class="text-xs text-sky-400 min-h-[1rem] mb-2"></p>
+
+    <div class="overflow-x-auto border border-gray-800 rounded-xl">
+      <table class="w-full text-xs">
+        <thead class="bg-gray-900 text-gray-400 uppercase text-[10px]"><tr>
+          <th class="text-left p-2">Reg.</th><th class="text-left p-2">Nome</th><th class="text-left p-2">Associação</th>
+          <th class="text-left p-2">Graduação</th><th class="text-left p-2">Anuidade</th><th class="text-left p-2">CNKB</th><th class="text-left p-2">Cargo</th><th></th>
+        </tr></thead>
+        <tbody id="tbody" class="divide-y divide-gray-800"></tbody>
+      </table>
+    </div>
+    <p id="rodape" class="text-[11px] text-gray-500 mt-2"></p>
+  </section>
+
+  <!-- EDITAR -->
+  <div id="modal" class="hidden fixed inset-0 bg-black/70 z-40 overflow-y-auto p-4">
+    <div class="max-w-2xl mx-auto bg-gray-900 border border-gray-700 rounded-2xl p-5 mt-6">
+      <h2 id="tituloModal" class="text-white font-bold mb-3"></h2>
+      <form id="formAtleta" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div><label class="lbl">Registro FIKARJ</label><input id="f_registro" type="number" class="inp"></div>
+        <div><label class="lbl">Nome</label><input id="f_nome" required class="inp"></div>
+        <div><label class="lbl">CPF</label><input id="f_cpf" maxlength="14" class="inp" placeholder="000.000.000-00"></div>
+        <div><label class="lbl">Data de nascimento</label><input id="f_nascimento" type="date" class="inp"></div>
+        <div><label class="lbl">Graduação</label><input id="f_graduacao" class="inp" placeholder="PRETA 1º DAN"></div>
+        <div><label class="lbl">Estilo</label><input id="f_estilo" class="inp"></div>
+        <div><label class="lbl">Data do exame</label><input id="f_data_exame" type="date" class="inp"></div>
+        <div><label class="lbl">Associação</label><select id="f_associacao" class="inp"></select></div>
+        <div><label class="lbl">Anuidade</label><select id="f_anuidade" class="inp"><option>2026</option><option>2027</option><option>Inativo</option></select></div>
+        <div><label class="lbl">Registro CNKB</label><input id="f_cnkb" class="inp" placeholder="Nº 1829"></div>
+        <div class="md:col-span-2"><label class="lbl">Cargo na Federação</label><input id="f_cargo" class="inp" placeholder="(vazio se não tiver)"></div>
+        <p id="msgModal" class="md:col-span-2 text-xs text-red-400 min-h-[1rem]"></p>
+        <div class="md:col-span-2 flex flex-wrap gap-2 justify-between">
+          <button type="button" id="btnExcluir" onclick="excluir()" class="text-xs text-red-400 hover:text-red-300 underline">Excluir atleta</button>
+          <div class="flex gap-2">
+            <button type="button" onclick="verCartao()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Ver carteirinha</button>
+            <button type="button" onclick="fechar()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Cancelar</button>
+            <button class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- IMPORTAR -->
+  <div id="modalImp" class="hidden fixed inset-0 bg-black/70 z-40 overflow-y-auto p-4">
+    <div class="max-w-xl mx-auto bg-gray-900 border border-gray-700 rounded-2xl p-5 mt-10">
+      <h2 class="text-white font-bold mb-2">Importar planilha</h2>
+      <div id="resumoImp" class="text-xs text-gray-300 space-y-1 mb-4"></div>
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('modalImp').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Cancelar</button>
+        <button id="btnConfImp" onclick="confirmarImport()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Confirmar importação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARTEIRINHA (visualização / geração de PDF) -->
+  <div id="modalCartao" class="hidden fixed inset-0 bg-black/80 z-50 overflow-auto p-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex justify-end mb-2"><button onclick="document.getElementById('modalCartao').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Fechar</button></div>
+      <div id="cartaoMount"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="cartao.js"></script>
+  <script>
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let atletas = [], assocs = [], editando = null, importPend = null;
+    const $ = id => document.getElementById(id);
+    const ativo = a => /202[67]/.test(String(a.anuidade));
+    const mapNome = () => Object.fromEntries(assocs.map(s => [s.sigla, s.nome]));
+    const digitos = s => String(s || '').replace(/\D/g, '');
+    const fmtCpf = d => d ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '';
+
+    montarCartao('cartaoMount');
+
+    // ---- login ----
+    $('formLogin').addEventListener('submit', async e => {
+      e.preventDefault();
+      $('msgLogin').textContent = '';
+      const { error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('senha').value });
+      if (error) { $('msgLogin').textContent = 'E-mail ou senha incorretos.'; return; }
+      iniciar();
+    });
+    async function sair() { await sb.auth.signOut(); location.reload(); }
+
+    async function iniciar() {
+      const { data: s } = await sb.auth.getSession();
+      if (!s.session) return;
+      const { data: adm } = await sb.from('admins').select('email');
+      if (!adm || !adm.length) {
+        await sb.auth.signOut();
+        $('msgLogin').textContent = 'Este usuário não tem permissão de administrador.';
+        return;
+      }
+      $('telaLogin').classList.add('hidden');
+      $('telaPainel').classList.remove('hidden');
+      await carregar();
+    }
+
+    async function carregar() {
+      const [a, b] = await Promise.all([
+        sb.from('atletas').select('*').order('nome').range(0, 4999),
+        sb.from('associacoes').select('*').order('sigla')
+      ]);
+      if (a.error || b.error) { $('aviso').textContent = 'Erro ao carregar dados.'; return; }
+      atletas = a.data; assocs = b.data;
+      const opts = assocs.map(s => `<option value="${s.sigla}">${s.sigla}</option>`).join('');
+      $('f_associacao').innerHTML = opts;
+      $('fAssoc').innerHTML = '<option value="">Todas as associações</option>' + assocs.map(s => `<option value="${s.sigla}">${s.sigla} (${atletas.filter(x => x.associacao === s.sigla).length})</option>`).join('');
+      filtrar();
+    }
+
+    function filtrar() {
+      const t = $('busca').value.trim().toLowerCase(), td = digitos(t), as = $('fAssoc').value, st = $('fStatus').value;
+      const lista = atletas.filter(a =>
+        (!as || a.associacao === as) &&
+        (!st || (st === 'ativo') === ativo(a)) &&
+        (!t || a.nome.toLowerCase().includes(t) || String(a.registro) === t || (td.length >= 3 && (a.cpf || '').includes(td))));
+      const at = atletas.filter(ativo).length;
+      $('stats').textContent = `${atletas.length} filiados · ${at} ativos · ${atletas.length - at} inativos · ${assocs.length} associações`;
+      $('rodape').textContent = lista.length > 300 ? `Mostrando 300 de ${lista.length}. Refine a busca.` : `${lista.length} resultado(s).`;
+      const tb = $('tbody'); tb.innerHTML = '';
+      lista.slice(0, 300).forEach(a => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-900 cursor-pointer';
+        const cel = (txt, cls) => { const td = document.createElement('td'); td.className = 'p-2 ' + (cls || ''); td.textContent = txt == null ? '' : txt; tr.appendChild(td); };
+        cel(a.registro == null ? '-' : String(a.registro).padStart(4, '0'), 'font-mono text-gray-400');
+        cel(a.nome, 'font-semibold text-gray-100');
+        cel(a.associacao); cel(a.graduacao);
+        cel(a.anuidade, ativo(a) ? 'text-green-400 font-bold' : 'text-red-400 font-bold');
+        cel(a.cnkb, 'text-gray-400'); cel(a.cargo, 'text-amber-300');
+        cel(a.cpf ? '' : 'sem CPF', 'text-red-400');
+        tr.onclick = () => abrir(a);
+        tb.appendChild(tr);
+      });
+    }
+
+    // ---- editar ----
+    const campos = ['registro', 'nome', 'cpf', 'nascimento', 'graduacao', 'estilo', 'data_exame', 'associacao', 'anuidade', 'cnkb', 'cargo'];
+    function abrir(a) {
+      editando = a; $('msgModal').textContent = '';
+      $('tituloModal').textContent = a ? 'Editar: ' + a.nome : 'Novo atleta';
+      campos.forEach(c => { $('f_' + c).value = a ? (c === 'cpf' ? fmtCpf(a.cpf) : (a[c] ?? '')) : (c === 'anuidade' ? 'Inativo' : ''); });
+      $('btnExcluir').classList.toggle('hidden', !a);
+      $('modal').classList.remove('hidden');
+    }
+    const novo = () => abrir(null);
+    const fechar = () => $('modal').classList.add('hidden');
+
+    function lerForm() {
+      const v = c => { const x = $('f_' + c).value.trim(); return x === '' ? null : x; };
+      const cpf = digitos(v('cpf')) || null;
+      return { registro: v('registro') ? parseInt(v('registro'), 10) : null, nome: (v('nome') || '').toUpperCase(), cpf,
+        nascimento: v('nascimento'), graduacao: v('graduacao'), estilo: v('estilo'), data_exame: v('data_exame'),
+        associacao: v('associacao'), anuidade: v('anuidade') || 'Inativo', cnkb: v('cnkb'), cargo: v('cargo') ? v('cargo').toUpperCase() : null };
+    }
+
+    $('formAtleta').addEventListener('submit', async e => {
+      e.preventDefault();
+      const d = lerForm();
+      if (d.cpf && d.cpf.length !== 11) { $('msgModal').textContent = 'CPF deve ter 11 dígitos.'; return; }
+      const r = editando ? await sb.from('atletas').update(d).eq('id', editando.id) : await sb.from('atletas').insert(d);
+      if (r.error) { $('msgModal').textContent = /duplicate|unique/i.test(r.error.message) ? 'Registro ou CPF já cadastrado em outro atleta.' : 'Erro ao salvar: ' + r.error.message; return; }
+      fechar(); await carregar();
+    });
+
+    async function excluir() {
+      if (!editando || !confirm('Excluir definitivamente ' + editando.nome + '? Esta ação não pode ser desfeita.')) return;
+      const r = await sb.from('atletas').delete().eq('id', editando.id);
+      if (r.error) { $('msgModal').textContent = 'Erro ao excluir: ' + r.error.message; return; }
+      fechar(); await carregar();
+    }
+
+    function paraCartao(a) {
+      return linhaParaAtleta({ ...a, associacao_nome: mapNome()[a.associacao] });
+    }
+    function verCartao() {
+      if (!editando) { $('msgModal').textContent = 'Salve o atleta antes de ver a carteirinha.'; return; }
+      renderizarCartao(paraCartao(editando));
+      $('modalCartao').classList.remove('hidden');
+    }
+
+    // ---- PDF em lote ----
+    async function lote() {
+      const as = $('fAssoc').value;
+      if (!as) { $('aviso').textContent = 'Escolha uma associação no filtro para gerar o PDF em lote.'; return; }
+      const itens = atletas.filter(a => a.associacao === as && ativo(a)).sort((x, y) => x.nome.localeCompare(y.nome));
+      if (!itens.length) { $('aviso').textContent = 'Nenhum filiado ativo nessa associação.'; return; }
+      const btn = $('btnLote'); btn.disabled = true;
+      $('modalCartao').classList.remove('hidden');
+      await gerarPDFCartoes(itens.map(paraCartao), 'Carteirinhas_FIKARJ_' + as + '.pdf', (i, n) => { btn.textContent = `Gerando ${i}/${n}...`; });
+      $('modalCartao').classList.add('hidden');
+      btn.disabled = false; btn.textContent = 'PDF em lote (ativos)';
+      $('aviso').textContent = `${itens.length} carteirinhas geradas (inativos não incluídos).`;
+    }
+
+    // ---- importar planilha ----
+    function paraISO(v) {
+      if (v == null || v === '') return null;
+      if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10);
+      const m = String(v).trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+      return /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? String(v).slice(0, 10) : null;
+    }
+    async function lerPlanilha(ev) {
+      const f = ev.target.files[0]; ev.target.value = '';
+      if (!f) return;
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      const ws = wb.Sheets['Dados'] || wb.Sheets[wb.SheetNames[0]];
+      const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+      const cab = (linhas[0] || []).map(h => String(h || '').toUpperCase());
+      const col = k => cab.findIndex(h => h.includes(k));
+      const ix = { r: col('REGIST'), s: col('ANUIDADE'), n: col('NOME'), c: col('CPF'), g: col('GRAD'), x: col('EXAME'), e: col('ESTILO'), b: col('NASC'), a: col('ENTIDADE') };
+      if (Object.values(ix).some(i => i < 0)) { alert('Colunas não reconhecidas. Use o mesmo formato da planilha "Dados".'); return; }
+      const siglas = new Set(assocs.map(s => s.sigla));
+      const novos = [], alterados = [], ignorados = [];
+      const porReg = new Map(atletas.filter(a => a.registro != null).map(a => [a.registro, a]));
+      const payload = [];
+      linhas.slice(1).forEach(l => {
+        if (l[ix.r] == null) return;
+        const reg = parseInt(l[ix.r], 10), sigla = String(l[ix.a] || '').trim();
+        if (!siglas.has(sigla)) { ignorados.push(`Reg. ${reg} (${l[ix.n]}): associação "${sigla}" não cadastrada`); return; }
+        const cpf = digitos(l[ix.c]) || null;
+        const o = { registro: reg, nome: String(l[ix.n]).trim().toUpperCase(), cpf, nascimento: paraISO(l[ix.b]), graduacao: l[ix.g], estilo: l[ix.e],
+          data_exame: paraISO(l[ix.x]), associacao: sigla, anuidade: String(l[ix.s] ?? 'Inativo') };
+        const ant = porReg.get(reg);
+        if (ant) ['cpf', 'nascimento', 'graduacao', 'estilo', 'data_exame'].forEach(k => { if (o[k] == null) o[k] = ant[k]; });
+        if (!ant) novos.push(o.nome);
+        else if (['nome', 'cpf', 'graduacao', 'estilo', 'associacao', 'anuidade', 'nascimento'].some(k => (ant[k] ?? null) !== (o[k] ?? null))) alterados.push(o.nome);
+        payload.push(o);
+      });
+      importPend = payload;
+      const lista = (t, arr) => `<p><b>${arr.length}</b> ${t}${arr.length ? ': <span class="text-gray-400">' + arr.slice(0, 6).join('; ') + (arr.length > 6 ? '…' : '') + '</span>' : ''}</p>`;
+      $('resumoImp').innerHTML = lista('novo(s)', novos) + lista('com dados alterados', alterados) + lista('ignorado(s)', ignorados) +
+        '<p class="text-gray-500 pt-2">Cargo e Registro CNKB não são alterados pela importação. Atletas que não estão na planilha não são removidos.</p>';
+      $('btnConfImp').disabled = !payload.length;
+      $('modalImp').classList.remove('hidden');
+    }
+    async function confirmarImport() {
+      $('btnConfImp').disabled = true;
+      for (let i = 0; i < importPend.length; i += 100) {
+        const { error } = await sb.from('atletas').upsert(importPend.slice(i, i + 100), { onConflict: 'registro' });
+        if (error) { alert('Erro na importação: ' + error.message); $('btnConfImp').disabled = false; return; }
+      }
+      $('modalImp').classList.add('hidden');
+      $('aviso').textContent = importPend.length + ' linhas importadas.';
+      await carregar();
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

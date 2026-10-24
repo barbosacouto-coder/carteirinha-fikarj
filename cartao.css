@@ -1,0 +1,38 @@
+
+    :root {
+      --fikarj-blue: #009FE3;
+      --fikarj-green: #009640;
+      --fikarj-red: #BE1622;
+      --fikarj-black: #0B0E14;
+      --fikarj-gold: #D4AF37;
+    }
+    body { font-family: 'Montserrat', sans-serif; background-color: #0b0f17; color: #f3f4f6; }
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    
+    /* Cartão CR-80 em proporção idêntica à carteira plástica física (500px x 316px) */
+    .card-id {
+      width: 500px;
+      height: 316px;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.12);
+      background: #ffffff;
+      color: #111827;
+    }
+
+    .color-band {
+      height: 6px;
+      width: 100%;
+      display: flex;
+    }
+    .band-blue { flex: 2; background-color: var(--fikarj-blue); }
+    .band-green { flex: 1; background-color: var(--fikarj-green); }
+    .band-red { flex: 1; background-color: var(--fikarj-red); }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  
