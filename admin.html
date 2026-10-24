@@ -49,7 +49,10 @@
       <select id="fStatus" onchange="filtrar()" class="inp md:col-span-2">
         <option value="">Todos os status</option><option value="ativo">Ativos</option><option value="inativo">Inativos</option>
       </select>
-      <button id="btnLote" onclick="lote()" class="md:col-span-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-2 py-2">PDF em lote (ativos)</button>
+      <select id="fSexo" onchange="filtrar()" class="inp md:col-span-1">
+        <option value="">Sexo: todos</option><option value="M">Masc.</option><option value="F">Fem.</option><option value="sem">Sem sexo</option>
+      </select>
+      <button id="btnLote" onclick="lote()" class="md:col-span-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-2 py-2">PDF em lote (ativos)</button>
     </div>
     <p id="aviso" class="text-xs text-sky-400 min-h-[1rem] mb-2"></p>
 
@@ -57,7 +60,7 @@
       <table class="w-full text-xs tabela-resp">
         <thead class="bg-gray-900 text-gray-400 uppercase text-[10px]"><tr>
           <th class="text-left p-2">Reg.</th><th class="text-left p-2">Nome</th><th class="text-left p-2">Associação</th>
-          <th class="text-left p-2">Graduação</th><th class="text-left p-2">Anuidade</th><th class="text-left p-2">CNKB</th><th class="text-left p-2">Cargo</th><th></th>
+          <th class="text-left p-2">Graduação</th><th class="text-left p-2">Sexo</th><th class="text-left p-2">Anuidade</th><th class="text-left p-2">CNKB</th><th class="text-left p-2">Cargo</th><th></th>
         </tr></thead>
         <tbody id="tbody" class="divide-y divide-gray-800"></tbody>
       </table>
@@ -79,6 +82,7 @@
         <div><label class="lbl">Data do exame</label><input id="f_data_exame" type="date" class="inp"></div>
         <div><label class="lbl">Associação</label><select id="f_associacao" class="inp"></select></div>
         <div><label class="lbl">Anuidade</label><select id="f_anuidade" class="inp"><option>2026</option><option>2027</option><option>Inativo</option></select></div>
+        <div><label class="lbl">Sexo (para ranking)</label><select id="f_sexo" class="inp"><option value="">— não informado —</option><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
         <div><label class="lbl">Registro CNKB</label><input id="f_cnkb" class="inp" placeholder="Nº 1829"></div>
         <div class="md:col-span-2"><label class="lbl">Cargo na Federação</label><input id="f_cargo" class="inp" placeholder="(vazio se não tiver)"></div>
         <p id="msgModal" class="md:col-span-2 text-xs text-red-400 min-h-[1rem]"></p>
@@ -181,13 +185,15 @@
     }
 
     function filtrar() {
-      const t = $('busca').value.trim().toLowerCase(), td = digitos(t), as = $('fAssoc').value, st = $('fStatus').value;
+      const t = $('busca').value.trim().toLowerCase(), td = digitos(t), as = $('fAssoc').value, st = $('fStatus').value, sx = $('fSexo').value;
       const lista = atletas.filter(a =>
         (!as || a.associacao === as) &&
         (!st || (st === 'ativo') === ativo(a)) &&
+        (!sx || (sx === 'sem' ? !a.sexo : a.sexo === sx)) &&
         (!t || a.nome.toLowerCase().includes(t) || String(a.registro) === t || (td.length >= 3 && (a.cpf || '').includes(td))));
       const at = atletas.filter(ativo).length;
-      $('stats').textContent = `${atletas.length} filiados · ${at} ativos · ${atletas.length - at} inativos · ${assocs.length} associações`;
+      const semSexoAtivos = atletas.filter(a => ativo(a) && !a.sexo).length;
+      $('stats').textContent = `${atletas.length} filiados · ${at} ativos · ${atletas.length - at} inativos · ${assocs.length} associações · ${semSexoAtivos} ativo(s) sem sexo cadastrado (ficam sem posição no ranking)`;
       $('rodape').textContent = lista.length > 300 ? `Mostrando 300 de ${lista.length}. Refine a busca.` : `${lista.length} resultado(s).`;
       const tb = $('tbody'); tb.innerHTML = '';
       lista.slice(0, 300).forEach(a => {
@@ -197,6 +203,7 @@
         cel(a.registro == null ? '-' : String(a.registro).padStart(4, '0'), 'font-mono text-gray-400', 'Reg.');
         cel(a.nome, 'font-semibold text-gray-100', 'Nome');
         cel(a.associacao, '', 'Associação'); cel(a.graduacao, '', 'Graduação');
+        cel(a.sexo === 'M' ? 'Masc.' : a.sexo === 'F' ? 'Fem.' : '—', a.sexo ? 'text-gray-300' : 'text-amber-400', 'Sexo');
         cel(a.anuidade, ativo(a) ? 'text-green-400 font-bold' : 'text-red-400 font-bold', 'Anuidade');
         cel(a.cnkb, 'text-gray-400', 'CNKB'); cel(a.cargo, 'text-amber-300', 'Cargo');
         cel(a.cpf ? '' : 'sem CPF', 'text-red-400', 'CPF');
@@ -206,7 +213,7 @@
     }
 
     // ---- editar ----
-    const campos = ['registro', 'nome', 'cpf', 'nascimento', 'graduacao', 'estilo', 'data_exame', 'associacao', 'anuidade', 'cnkb', 'cargo'];
+    const campos = ['registro', 'nome', 'cpf', 'nascimento', 'graduacao', 'estilo', 'data_exame', 'associacao', 'anuidade', 'sexo', 'cnkb', 'cargo'];
     function abrir(a) {
       editando = a; $('msgModal').textContent = '';
       $('tituloModal').textContent = a ? 'Editar: ' + a.nome : 'Novo atleta';
@@ -222,7 +229,7 @@
       const cpf = digitos(v('cpf')) || null;
       return { registro: v('registro') ? parseInt(v('registro'), 10) : null, nome: (v('nome') || '').toUpperCase(), cpf,
         nascimento: v('nascimento'), graduacao: v('graduacao'), estilo: v('estilo'), data_exame: v('data_exame'),
-        associacao: v('associacao'), anuidade: v('anuidade') || 'Inativo', cnkb: v('cnkb'), cargo: v('cargo') ? v('cargo').toUpperCase() : null };
+        associacao: v('associacao'), anuidade: v('anuidade') || 'Inativo', sexo: v('sexo'), cnkb: v('cnkb'), cargo: v('cargo') ? v('cargo').toUpperCase() : null };
     }
 
     $('formAtleta').addEventListener('submit', async e => {
@@ -333,7 +340,7 @@
       cad.forEach(l => { const reg = parseInt(l['Registro'], 10); if (!isNaN(reg) && l['Nome']) nomeParaReg.set(normNome(l['Nome']), reg); });
       const linhas = XLSX.utils.sheet_to_json(wsAtletas, { defval: null });
       const porReg = new Map(atletas.filter(a => a.registro != null).map(a => [a.registro, a]));
-      const brutos = [], semCorrespCadastro = [], naoCadastradosNoPortal = [], inativosExcluidos = [];
+      const brutos = [], semCorrespCadastro = [], naoCadastradosNoPortal = [], inativosExcluidos = [], semSexo = [];
       linhas.forEach(l => {
         const nome = l['Atleta']; if (!nome) return;
         const reg = nomeParaReg.get(normNome(nome));
@@ -341,8 +348,8 @@
         const at = porReg.get(reg);
         if (!at) { naoCadastradosNoPortal.push(`${nome} (reg. ${reg})`); return; }
         if (!ativo(at)) { inativosExcluidos.push(`${nome} (reg. ${reg})`); return; }
-        brutos.push({
-          registro: reg, nome,
+        const item = {
+          registro: reg, nome, sexo: at.sexo || null, associacao: at.associacao || null,
           ranking_pontos: parseInt(l['Pontos'], 10) || 0,
           ranking_ouro: parseInt(l['Ouro'], 10) || 0,
           ranking_prata: parseInt(l['Prata'], 10) || 0,
@@ -350,17 +357,33 @@
           ranking_quarto: parseInt(l['4º'], 10) || 0,
           ranking_eventos: l['Eventos'] || null,
           ranking_modalidades: l['Modalidades'] || null
-        });
+        };
+        if (!item.sexo) semSexo.push(`${nome} (reg. ${reg})`);
+        brutos.push(item);
       });
-      // recalcula a posição só entre quem está com anuidade em dia (regra de desempate do guia: pontos, ouros, pratas, bronzes, nome)
-      brutos.sort((a, b) => b.ranking_pontos - a.ranking_pontos || b.ranking_ouro - a.ranking_ouro || b.ranking_prata - a.ranking_prata || b.ranking_bronze - a.ranking_bronze || a.nome.localeCompare(b.nome));
-      const payload = brutos.map((p, i) => { const { nome, ...resto } = p; return { ...resto, ranking_pos: i + 1 }; });
+      // regra de desempate do guia: pontos, ouros, pratas, bronzes, nome
+      const desempate = (a, b) => b.ranking_pontos - a.ranking_pontos || b.ranking_ouro - a.ranking_ouro || b.ranking_prata - a.ranking_prata || b.ranking_bronze - a.ranking_bronze || a.nome.localeCompare(b.nome);
+      // ranking geral masculino/feminino: só entre quem tem sexo cadastrado, separado por sexo
+      ['M', 'F'].forEach(sx => {
+        brutos.filter(p => p.sexo === sx).sort(desempate).forEach((p, i) => { p.ranking_pos = i + 1; });
+      });
+      // ranking masculino/feminino por associação: mesma separação, dentro de cada associação
+      const chaves = new Set(brutos.filter(p => p.sexo && p.associacao).map(p => p.sexo + '|' + p.associacao));
+      chaves.forEach(ch => {
+        const [sx, as] = ch.split('|');
+        brutos.filter(p => p.sexo === sx && p.associacao === as).sort(desempate).forEach((p, i) => { p.ranking_pos_assoc = i + 1; });
+      });
+      const payload = brutos.map(p => {
+        const { nome, sexo, associacao, ...resto } = p;
+        return { ...resto, ranking_pos: p.ranking_pos || null, ranking_pos_assoc: p.ranking_pos_assoc || null };
+      });
       pendRanking = payload;
       const lista = (t, arr) => `<p><b>${arr.length}</b> ${t}${arr.length ? ': <span class="text-gray-400">' + arr.slice(0, 6).join('; ') + (arr.length > 6 ? '…' : '') + '</span>' : ''}</p>`;
-      $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado (posição recalculada só entre quem está com anuidade em dia)', payload.map(p => p.registro)) +
+      $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado (posições geral e por associação, calculadas separadamente por sexo, só entre quem está com anuidade em dia)', payload.map(p => p.registro)) +
         lista('nome(s) da planilha sem correspondência na aba "Cadastro" (não foram importados)', semCorrespCadastro) +
         lista('atleta(s) com ranking mas ainda não cadastrados no Portal Ficast (não foram importados)', naoCadastradosNoPortal) +
         lista('atleta(s) com pódio mas anuidade inativa (não entram no ranking individual)', inativosExcluidos) +
+        lista('atleta(s) com pódio mas SEM SEXO cadastrado no painel (estatísticas serão salvas, mas sem posição no ranking até o sexo ser preenchido em "Editar atleta")', semSexo) +
         '<p class="text-amber-300 pt-2">Atenção: todos os demais atletas (que não aparecem na planilha, ou cuja anuidade não está em dia) terão o ranking individual limpo/zerado nesta importação.</p>';
       $('f_rankData').value = new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = !payload.length;
@@ -370,7 +393,7 @@
       const data = $('f_rankData').value || new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = true;
       const limpar = await sb.from('atletas').update({
-        ranking_pos: null, ranking_pontos: null, ranking_ouro: null, ranking_prata: null,
+        ranking_pos: null, ranking_pos_assoc: null, ranking_pontos: null, ranking_ouro: null, ranking_prata: null,
         ranking_bronze: null, ranking_quarto: null, ranking_eventos: null, ranking_modalidades: null, ranking_atualizado_em: null
       }).gt('id', 0);
       if (limpar.error) { alert('Erro ao limpar ranking anterior: ' + limpar.error.message); $('btnConfImpRank').disabled = false; return; }
