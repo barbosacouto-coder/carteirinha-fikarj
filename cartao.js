@@ -122,7 +122,7 @@ function renderizarCartao(atleta) {
   $('cardReg').innerText = 'REG: Nº ' + regTxt(atleta.r);
   $('cardNome').innerText = atleta.n;
   $('cardGrad').innerText = atleta.g || '';
-  $('cardEstilo').innerText = atleta.e || '';
+  $('cardEstilo').innerText = String(atleta.e || '').replace(/SEIGOKAN\s+II$/i, 'SEIGOKAN');
   $('cardEntidade').innerText = atleta.d;           // so a sigla da associacao
   $('authHash').innerText = 'HASH: FIK-' + regTxt(atleta.r) + '-AUT';
   $('cardTitulo').innerText = isPreta ? 'CARTEIRA DO PROFESSOR' : 'CARTEIRA DO ESTUDANTE';

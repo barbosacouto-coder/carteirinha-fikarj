@@ -45,6 +45,14 @@
       box.appendChild(linha('Estilo', data.estilo));
       box.appendChild(linha('Associação', data.associacao_nome));
       box.appendChild(linha('Registro FIKARJ', data.registro == null ? '-' : String(data.registro).padStart(4, '0')));
+      const grad = String(data.graduacao || '').toUpperCase();
+      const preta = grad.includes('PRETA') || grad.includes('DAN');
+      const bt = document.createElement('a');
+      bt.href = preta ? 'https://www.fikarj.com.br/Home/list_professores?page=2' : 'https://www.fikarj.com.br/Home/list_athletes_black';
+      bt.target = '_blank'; bt.rel = 'noopener noreferrer';
+      bt.className = 'block mt-5 text-center bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm py-3 rounded-xl';
+      bt.textContent = 'Ir para o site da FIKARJ';
+      box.appendChild(bt);
     })();
   </script>
 </body>
