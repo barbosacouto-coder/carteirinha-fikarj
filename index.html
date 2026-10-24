@@ -105,7 +105,7 @@
       aviso.classList.toggle('hidden', ativo);
       aviso.textContent = 'Sua anuidade consta como inativa. Procure a sua associação ou a FIKARJ para regularizar e emitir a carteirinha.';
       document.getElementById('cartaoMount').classList.toggle('hidden', !ativo);
-      if (ativo) renderizarCartao(atual);
+      if (ativo) { renderizarCartao(atual); ajustarEscalaCartoes(); }
     }
 
     async function baixar() {

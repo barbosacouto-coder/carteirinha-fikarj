@@ -53,7 +53,7 @@
     <p id="aviso" class="text-xs text-sky-400 min-h-[1rem] mb-2"></p>
 
     <div class="overflow-x-auto border border-gray-800 rounded-xl">
-      <table class="w-full text-xs">
+      <table class="w-full text-xs tabela-resp">
         <thead class="bg-gray-900 text-gray-400 uppercase text-[10px]"><tr>
           <th class="text-left p-2">Reg.</th><th class="text-left p-2">Nome</th><th class="text-left p-2">Associação</th>
           <th class="text-left p-2">Graduação</th><th class="text-left p-2">Anuidade</th><th class="text-left p-2">CNKB</th><th class="text-left p-2">Cargo</th><th></th>
@@ -176,13 +176,13 @@
       lista.slice(0, 300).forEach(a => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-900 cursor-pointer';
-        const cel = (txt, cls) => { const td = document.createElement('td'); td.className = 'p-2 ' + (cls || ''); td.textContent = txt == null ? '' : txt; tr.appendChild(td); };
-        cel(a.registro == null ? '-' : String(a.registro).padStart(4, '0'), 'font-mono text-gray-400');
-        cel(a.nome, 'font-semibold text-gray-100');
-        cel(a.associacao); cel(a.graduacao);
-        cel(a.anuidade, ativo(a) ? 'text-green-400 font-bold' : 'text-red-400 font-bold');
-        cel(a.cnkb, 'text-gray-400'); cel(a.cargo, 'text-amber-300');
-        cel(a.cpf ? '' : 'sem CPF', 'text-red-400');
+        const cel = (txt, cls, rot) => { const td = document.createElement('td'); td.className = 'p-2 ' + (cls || ''); if (rot) td.setAttribute('data-label', rot); td.textContent = txt == null ? '' : txt; tr.appendChild(td); };
+        cel(a.registro == null ? '-' : String(a.registro).padStart(4, '0'), 'font-mono text-gray-400', 'Reg.');
+        cel(a.nome, 'font-semibold text-gray-100', 'Nome');
+        cel(a.associacao, '', 'Associação'); cel(a.graduacao, '', 'Graduação');
+        cel(a.anuidade, ativo(a) ? 'text-green-400 font-bold' : 'text-red-400 font-bold', 'Anuidade');
+        cel(a.cnkb, 'text-gray-400', 'CNKB'); cel(a.cargo, 'text-amber-300', 'Cargo');
+        cel(a.cpf ? '' : 'sem CPF', 'text-red-400', 'CPF');
         tr.onclick = () => abrir(a);
         tb.appendChild(tr);
       });
@@ -229,8 +229,8 @@
     }
     function verCartao() {
       if (!editando) { $('msgModal').textContent = 'Salve o atleta antes de ver a carteirinha.'; return; }
-      renderizarCartao(paraCartao(editando));
       $('modalCartao').classList.remove('hidden');
+      renderizarCartao(paraCartao(editando));
     }
 
     // ---- PDF em lote ----
