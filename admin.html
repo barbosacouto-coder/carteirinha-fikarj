@@ -130,6 +130,13 @@
   <div id="modalCartao" class="hidden fixed inset-0 bg-black/80 z-50 overflow-auto p-4">
     <div class="max-w-6xl mx-auto">
       <div class="flex justify-end mb-2"><button onclick="document.getElementById('modalCartao').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Fechar</button></div>
+      <div id="rankingAdmin" class="hidden max-w-xl mx-auto bg-gray-900/90 border border-gray-800 rounded-xl p-4 text-sm text-center mb-4">
+        <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Ranking individual FIKARJ 2026</p>
+        <p id="rankingAdminGeral" class="hidden text-white font-bold"></p>
+        <p id="rankingAdminAssoc" class="hidden text-white font-bold"></p>
+        <p id="rankingAdminMedalhas" class="text-gray-400 text-xs mt-1"></p>
+      </div>
+      <div id="rankingAdminAviso" class="hidden max-w-xl mx-auto bg-amber-950/60 border border-amber-800 text-amber-200 rounded-xl p-3 text-xs text-center mb-4"></div>
       <div id="cartaoMount"></div>
     </div>
   </div>
@@ -251,9 +258,39 @@
     function paraCartao(a) {
       return linhaParaAtleta({ ...a, associacao_nome: mapNome()[a.associacao] });
     }
+    function mostrarRankingAdmin(a) {
+      const rb = $('rankingAdmin'), txtGeral = $('rankingAdminGeral'), txtAssoc = $('rankingAdminAssoc'), aviso = $('rankingAdminAviso');
+      if (!a.sexo) {
+        rb.classList.add('hidden');
+        aviso.classList.remove('hidden');
+        aviso.textContent = 'Este atleta ainda não tem sexo cadastrado — por isso a posição no ranking não aparece na carteirinha dele até você preencher o campo "Sexo" acima.';
+        return;
+      }
+      aviso.classList.add('hidden');
+      if (!a.ranking_pos && !a.ranking_pos_assoc) {
+        rb.classList.add('hidden');
+        return;
+      }
+      const categoria = a.sexo === 'F' ? 'feminino' : 'masculino';
+      rb.classList.remove('hidden');
+      if (a.ranking_pos) {
+        txtGeral.classList.remove('hidden');
+        txtGeral.textContent = a.ranking_pos + 'º lugar no ranking geral ' + categoria + ' · ' + a.ranking_pontos + ' pontos';
+      } else {
+        txtGeral.classList.add('hidden');
+      }
+      if (a.ranking_pos_assoc) {
+        txtAssoc.classList.remove('hidden');
+        txtAssoc.textContent = a.ranking_pos_assoc + 'º lugar no ranking ' + categoria + ' da associação ' + (a.associacao || '');
+      } else {
+        txtAssoc.classList.add('hidden');
+      }
+      $('rankingAdminMedalhas').textContent = '🥇 ' + (a.ranking_ouro || 0) + '   🥈 ' + (a.ranking_prata || 0) + '   🥉 ' + (a.ranking_bronze || 0) + (a.ranking_atualizado_em ? '  ·  atualizado em ' + a.ranking_atualizado_em.split('-').reverse().join('/') : '');
+    }
     function verCartao() {
       if (!editando) { $('msgModal').textContent = 'Salve o atleta antes de ver a carteirinha.'; return; }
       $('modalCartao').classList.remove('hidden');
+      mostrarRankingAdmin(editando);
       renderizarCartao(paraCartao(editando));
     }
 
@@ -263,6 +300,8 @@
       if (!as) { $('aviso').textContent = 'Escolha uma associação no filtro para gerar o PDF em lote.'; return; }
       const itens = atletas.filter(a => a.associacao === as && ativo(a)).sort((x, y) => x.nome.localeCompare(y.nome));
       if (!itens.length) { $('aviso').textContent = 'Nenhum filiado ativo nessa associação.'; return; }
+      $('rankingAdmin').classList.add('hidden');
+      $('rankingAdminAviso').classList.add('hidden');
       const btn = $('btnLote'); btn.disabled = true;
       $('modalCartao').classList.remove('hidden');
       await gerarPDFCartoes(itens.map(paraCartao), 'Carteirinhas_FIKARJ_' + as + '.pdf', (i, n) => { btn.textContent = `Gerando ${i}/${n}...`; });
