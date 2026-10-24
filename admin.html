@@ -274,7 +274,7 @@
         const reg = parseInt(l[ix.r], 10), sigla = String(l[ix.a] || '').trim();
         if (!siglas.has(sigla)) { ignorados.push(`Reg. ${reg} (${l[ix.n]}): associação "${sigla}" não cadastrada`); return; }
         const cpf = digitos(l[ix.c]) || null;
-        const o = { registro: reg, nome: String(l[ix.n]).trim().toUpperCase(), cpf, nascimento: paraISO(l[ix.b]), graduacao: l[ix.g], estilo: l[ix.e] == null ? null : String(l[ix.e]).replace(/SEIGOKAN\s+II$/i, 'SEIGOKAN'),
+        const o = { registro: reg, nome: String(l[ix.n]).trim().toUpperCase(), cpf, nascimento: paraISO(l[ix.b]), graduacao: l[ix.g], estilo: l[ix.e] == null ? null : String(l[ix.e]).replace(/^GOJU\s*RYU\s+SEIGOKAN(\s+II)?$/i, 'GOJU RYU SEIGOKAN'),
           data_exame: paraISO(l[ix.x]), associacao: sigla, anuidade: String(l[ix.s] ?? 'Inativo') };
         const ant = porReg.get(reg);
         if (ant) ['cpf', 'nascimento', 'graduacao', 'estilo', 'data_exame'].forEach(k => { if (o[k] == null) o[k] = ant[k]; });
