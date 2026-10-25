@@ -85,6 +85,12 @@
         <div><label class="lbl">Sexo (para ranking)</label><select id="f_sexo" class="inp"><option value="">— não informado —</option><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
         <div><label class="lbl">Registro CNKB</label><input id="f_cnkb" class="inp" placeholder="Nº 1829"></div>
         <div class="md:col-span-2"><label class="lbl">Cargo na Federação</label><input id="f_cargo" class="inp" placeholder="(vazio se não tiver)"></div>
+        <div class="md:col-span-2 bg-amber-950/40 border border-amber-900 rounded-lg p-3">
+          <label class="flex items-start gap-2 text-xs text-amber-200 cursor-pointer">
+            <input type="checkbox" id="f_ranking_so_assoc" class="mt-0.5">
+            <span>Exceção de ranking: contar os pontos deste atleta <b>só</b> no ranking por sexo da associação. Fica de fora do ranking geral FIKARJ, geral por sexo e geral da associação (misto). Use quando o atleta competiu sozinho ou com pouquíssimos adversários na categoria.</span>
+          </label>
+        </div>
         <p id="msgModal" class="md:col-span-2 text-xs text-red-400 min-h-[1rem]"></p>
         <div class="md:col-span-2 flex flex-wrap gap-2 justify-between">
           <button type="button" id="btnExcluir" onclick="excluir()" class="text-xs text-red-400 hover:text-red-300 underline">Excluir atleta</button>
@@ -227,6 +233,7 @@
       editando = a; $('msgModal').textContent = '';
       $('tituloModal').textContent = a ? 'Editar: ' + a.nome : 'Novo atleta';
       campos.forEach(c => { $('f_' + c).value = a ? (c === 'cpf' ? fmtCpf(a.cpf) : (a[c] ?? '')) : (c === 'anuidade' ? 'Inativo' : ''); });
+      $('f_ranking_so_assoc').checked = a ? !!a.ranking_so_assoc : false;
       $('btnExcluir').classList.toggle('hidden', !a);
       $('modal').classList.remove('hidden');
     }
@@ -238,7 +245,8 @@
       const cpf = digitos(v('cpf')) || null;
       return { registro: v('registro') ? parseInt(v('registro'), 10) : null, nome: (v('nome') || '').toUpperCase(), cpf,
         nascimento: v('nascimento'), graduacao: v('graduacao'), estilo: v('estilo'), data_exame: v('data_exame'),
-        associacao: v('associacao'), anuidade: v('anuidade') || 'Inativo', sexo: v('sexo'), cnkb: v('cnkb'), cargo: v('cargo') ? v('cargo').toUpperCase() : null };
+        associacao: v('associacao'), anuidade: v('anuidade') || 'Inativo', sexo: v('sexo'), cnkb: v('cnkb'), cargo: v('cargo') ? v('cargo').toUpperCase() : null,
+        ranking_so_assoc: $('f_ranking_so_assoc').checked };
     }
 
     $('formAtleta').addEventListener('submit', async e => {
@@ -271,6 +279,9 @@
       if (!a.sexo) {
         aviso.classList.remove('hidden');
         aviso.textContent = 'Este atleta ainda não tem sexo cadastrado — por isso as posições por sexo não aparecem na carteirinha dele até você preencher o campo "Sexo" acima.';
+      } else if (a.ranking_so_assoc) {
+        aviso.classList.remove('hidden');
+        aviso.textContent = 'Este atleta está marcado com a exceção "só associação" — por isso só a posição no ranking por sexo da associação aparece na carteirinha dele.';
       } else {
         aviso.classList.add('hidden');
       }
@@ -403,7 +414,7 @@
         if (!at) { naoCadastradosNoPortal.push(`${nome} (reg. ${reg})`); return; }
         if (!ativo(at)) { inativosExcluidos.push(`${nome} (reg. ${reg})`); return; }
         const item = {
-          registro: reg, nome, sexo: at.sexo || null, associacao: at.associacao || null,
+          registro: reg, nome, sexo: at.sexo || null, associacao: at.associacao || null, soAssoc: !!at.ranking_so_assoc,
           ranking_pontos: parseInt(l['Pontos'], 10) || 0,
           ranking_ouro: parseInt(l['Ouro'], 10) || 0,
           ranking_prata: parseInt(l['Prata'], 10) || 0,
@@ -417,25 +428,26 @@
       });
       // regra de desempate do guia: pontos, ouros, pratas, bronzes, nome
       const desempate = (a, b) => b.ranking_pontos - a.ranking_pontos || b.ranking_ouro - a.ranking_ouro || b.ranking_prata - a.ranking_prata || b.ranking_bronze - a.ranking_bronze || a.nome.localeCompare(b.nome);
-      // 1. ranking geral FIKARJ misto: todos os atletas (ambos os sexos) com anuidade em dia
-      brutos.slice().sort(desempate).forEach((p, i) => { p.ranking_pos_geral = i + 1; });
-      // 2. ranking geral masculino/feminino: só entre quem tem sexo cadastrado, separado por sexo
+      // 1. ranking geral FIKARJ misto: todos os atletas (ambos os sexos) com anuidade em dia, exceto os marcados como "só associação"
+      brutos.filter(p => !p.soAssoc).sort(desempate).forEach((p, i) => { p.ranking_pos_geral = i + 1; });
+      // 2. ranking geral masculino/feminino: só entre quem tem sexo cadastrado, separado por sexo, exceto os marcados como "só associação"
       ['M', 'F'].forEach(sx => {
-        brutos.filter(p => p.sexo === sx).sort(desempate).forEach((p, i) => { p.ranking_pos = i + 1; });
+        brutos.filter(p => p.sexo === sx && !p.soAssoc).sort(desempate).forEach((p, i) => { p.ranking_pos = i + 1; });
       });
-      // 3. ranking geral da associação (misto): todos os atletas da associação, ambos os sexos juntos
+      // 3. ranking geral da associação (misto): todos os atletas da associação, ambos os sexos juntos, exceto os marcados como "só associação"
       const assocs2 = new Set(brutos.filter(p => p.associacao).map(p => p.associacao));
       assocs2.forEach(as => {
-        brutos.filter(p => p.associacao === as).sort(desempate).forEach((p, i) => { p.ranking_pos_assoc_geral = i + 1; });
+        brutos.filter(p => p.associacao === as && !p.soAssoc).sort(desempate).forEach((p, i) => { p.ranking_pos_assoc_geral = i + 1; });
       });
-      // 4. ranking masculino/feminino por associação: mesma separação, dentro de cada associação
+      // 4. ranking masculino/feminino por associação: mesma separação, dentro de cada associação (inclui os marcados como "só associação")
       const chaves = new Set(brutos.filter(p => p.sexo && p.associacao).map(p => p.sexo + '|' + p.associacao));
       chaves.forEach(ch => {
         const [sx, as] = ch.split('|');
         brutos.filter(p => p.sexo === sx && p.associacao === as).sort(desempate).forEach((p, i) => { p.ranking_pos_assoc = i + 1; });
       });
+      const soAssocNomes = brutos.filter(p => p.soAssoc).map(p => `${p.nome} (reg. ${p.registro})`);
       const payload = brutos.map(p => {
-        const { nome, sexo, associacao, ...resto } = p;
+        const { nome, sexo, associacao, soAssoc, ...resto } = p;
         return { ...resto, ranking_pos_geral: p.ranking_pos_geral || null, ranking_pos: p.ranking_pos || null, ranking_pos_assoc_geral: p.ranking_pos_assoc_geral || null, ranking_pos_assoc: p.ranking_pos_assoc || null };
       });
       pendRanking = payload;
@@ -444,6 +456,7 @@
         lista('nome(s) da planilha sem correspondência na aba "Cadastro" (não foram importados)', semCorrespCadastro) +
         lista('atleta(s) com ranking mas ainda não cadastrados no Portal Ficast (não foram importados)', naoCadastradosNoPortal) +
         lista('atleta(s) com pódio mas anuidade inativa (não entram no ranking individual)', inativosExcluidos) +
+        lista('atleta(s) marcados com exceção "só associação" (contam só no ranking por sexo da associação; ficam fora do geral FIKARJ, geral por sexo e geral da associação)', soAssocNomes) +
         lista('atleta(s) com pódio mas SEM SEXO cadastrado no painel (estatísticas serão salvas, mas sem posição no ranking até o sexo ser preenchido em "Editar atleta")', semSexo) +
         '<p class="text-amber-300 pt-2">Atenção: todos os demais atletas (que não aparecem na planilha, ou cuja anuidade não está em dia) terão o ranking individual limpo/zerado nesta importação.</p>';
       $('f_rankData').value = new Date().toISOString().slice(0, 10);
