@@ -45,7 +45,7 @@
     <div id="stats" class="text-[11px] text-gray-400 mb-3"></div>
 
     <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3">
-      <input id="busca" oninput="filtrar()" placeholder="Buscar por nome, registro ou CPF" class="inp md:col-span-5">
+      <input id="busca" oninput="filtrar()" placeholder="Buscar por nome, registro ou CPF" class="inp md:col-span-4">
       <select id="fAssoc" onchange="filtrar()" class="inp md:col-span-3"></select>
       <select id="fStatus" onchange="filtrar()" class="inp md:col-span-2">
         <option value="">Todos os status</option><option value="ativo">Ativos</option><option value="inativo">Inativos</option>
@@ -54,6 +54,7 @@
         <option value="">Sexo: todos</option><option value="M">Masc.</option><option value="F">Fem.</option><option value="sem">Sem sexo</option>
       </select>
       <button id="btnLote" onclick="lote()" class="md:col-span-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-2 py-2">PDF em lote (ativos)</button>
+      <button id="btnExportarLista" onclick="exportarListaPDF()" class="md:col-span-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-2 py-2">Exportar lista (PDF)</button>
     </div>
     <p id="aviso" class="text-xs text-sky-400 min-h-[1rem] mb-2"></p>
 
@@ -138,7 +139,10 @@
     <div class="max-w-3xl mx-auto bg-gray-900 border border-gray-700 rounded-2xl p-5 mt-6">
       <div class="flex items-center justify-between mb-3 gap-3">
         <h2 class="text-white font-bold">Rankings FIKARJ 2026</h2>
-        <button onclick="document.getElementById('modalRanking').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Fechar</button>
+        <div class="flex gap-2">
+          <button onclick="exportarRankingPDF()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-3 py-2 rounded-lg">Exportar PDF</button>
+          <button onclick="document.getElementById('modalRanking').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Fechar</button>
+        </div>
       </div>
       <div class="flex flex-wrap gap-2 mb-1 text-xs">
         <button id="abaRankGeral" onclick="trocarAbaRanking('geral')" class="px-3 py-2 rounded-lg font-semibold">Geral FIKARJ</button>
@@ -228,6 +232,7 @@
       filtrar();
     }
 
+    let listaFiltradaAtual = [];
     function filtrar() {
       const t = $('busca').value.trim().toLowerCase(), td = digitos(t), as = $('fAssoc').value, st = $('fStatus').value, sx = $('fSexo').value;
       const lista = atletas.filter(a =>
@@ -235,6 +240,7 @@
         (!st || (st === 'ativo') === ativo(a)) &&
         (!sx || (sx === 'sem' ? !a.sexo : a.sexo === sx)) &&
         (!t || a.nome.toLowerCase().includes(t) || String(a.registro) === t || (td.length >= 3 && (a.cpf || '').includes(td))));
+      listaFiltradaAtual = lista;
       const at = atletas.filter(ativo).length;
       const semSexoAtivos = atletas.filter(a => ativo(a) && !a.sexo).length;
       $('stats').textContent = `${atletas.length} filiados · ${at} ativos · ${atletas.length - at} inativos · ${assocs.length} associações · ${semSexoAtivos} ativo(s) sem sexo cadastrado (ficam sem posição no ranking)`;
@@ -365,6 +371,7 @@
       $('selAssocRanking').classList.toggle('hidden', aba !== 'assoc');
       renderRanking();
     }
+    let rankingListaAtual = [], rankingCampoPosAtual = '';
     function renderRanking() {
       let lista = [], campoPos = '';
       if (abaRankingAtual === 'geral') {
@@ -378,6 +385,7 @@
         lista = atletas.filter(a => a.associacao === as && a.ranking_pos_assoc_geral).sort((x, y) => x.ranking_pos_assoc_geral - y.ranking_pos_assoc_geral);
         campoPos = 'ranking_pos_assoc_geral';
       }
+      rankingListaAtual = lista; rankingCampoPosAtual = campoPos;
       const tb = $('tbodyRanking'); tb.innerHTML = '';
       lista.forEach(a => {
         const tr = document.createElement('tr');
@@ -388,6 +396,103 @@
       $('rodapeRanking').textContent = lista.length + ' atleta(s) classificado(s).';
       const ult = lista.length ? lista[0].ranking_atualizado_em : null;
       $('rankingAtualizadoEm').textContent = ult ? ('Atualizado em ' + ult.split('-').reverse().join('/')) : (lista.length ? '' : 'Nenhum atleta classificado nesta categoria ainda.');
+    }
+
+    // ---- exportar relações em PDF ----
+    function truncarTexto(doc, texto, maxWidth) {
+      texto = String(texto == null ? '' : texto);
+      if (doc.getTextWidth(texto) <= maxWidth) return texto;
+      let t = texto;
+      while (t.length > 1 && doc.getTextWidth(t + '…') > maxWidth) t = t.slice(0, -1);
+      return t + '…';
+    }
+    function gerarPDFLista(titulo, subtitulo, colunas, linhas, nomeArquivo) {
+      const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const margin = 40;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const totalWidth = pageWidth - margin * 2;
+      const widths = colunas.map(c => c.largura * totalWidth);
+      let y = margin;
+      function cabecalhoPagina() {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(20, 20, 20);
+        doc.text(titulo, margin, y);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
+        doc.text(subtitulo, margin, y + 16);
+        y += 34;
+        doc.setFillColor(30, 41, 59);
+        doc.rect(margin, y, totalWidth, 20, 'F');
+        doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+        let x = margin;
+        colunas.forEach((c, i) => { doc.text(c.titulo, x + 4, y + 14); x += widths[i]; });
+        y += 20;
+        doc.setTextColor(20, 20, 20); doc.setFont('helvetica', 'normal');
+      }
+      cabecalhoPagina();
+      linhas.forEach((linha, idx) => {
+        if (y > pageHeight - margin - 20) { doc.addPage(); y = margin; cabecalhoPagina(); }
+        if (idx % 2 === 1) { doc.setFillColor(243, 244, 246); doc.rect(margin, y, totalWidth, 18, 'F'); }
+        let x = margin;
+        colunas.forEach((c, i) => {
+          doc.text(truncarTexto(doc, linha[c.chave], widths[i] - 8), x + 4, y + 13);
+          x += widths[i];
+        });
+        y += 18;
+      });
+      doc.setFontSize(8); doc.setTextColor(140, 140, 140);
+      doc.text(linhas.length + ' registro(s).', margin, pageHeight - 18);
+      doc.save(nomeArquivo);
+    }
+    function exportarListaPDF() {
+      if (!listaFiltradaAtual.length) { $('aviso').textContent = 'Nenhum atleta para exportar.'; return; }
+      const linhas = listaFiltradaAtual.map(a => ({
+        registro: a.registro == null ? '-' : String(a.registro).padStart(4, '0'),
+        nome: a.nome,
+        associacao: a.associacao || '',
+        graduacao: a.graduacao || '',
+        sexo: a.sexo === 'M' ? 'Masc.' : a.sexo === 'F' ? 'Fem.' : '—',
+        anuidade: a.anuidade || '',
+        cnkb: a.cnkb || '',
+        cargo: a.cargo || ''
+      }));
+      const colunas = [
+        { titulo: 'Reg.', chave: 'registro', largura: 0.07 },
+        { titulo: 'Nome', chave: 'nome', largura: 0.27 },
+        { titulo: 'Associação', chave: 'associacao', largura: 0.12 },
+        { titulo: 'Graduação', chave: 'graduacao', largura: 0.17 },
+        { titulo: 'Sexo', chave: 'sexo', largura: 0.08 },
+        { titulo: 'Anuidade', chave: 'anuidade', largura: 0.10 },
+        { titulo: 'CNKB', chave: 'cnkb', largura: 0.09 },
+        { titulo: 'Cargo', chave: 'cargo', largura: 0.10 }
+      ];
+      const subtitulo = 'FIKARJ · Relação de filiados · gerado em ' + new Date().toLocaleDateString('pt-BR');
+      gerarPDFLista('Relação de Filiados FIKARJ', subtitulo, colunas, linhas, 'Relacao_Filiados_FIKARJ.pdf');
+    }
+    function exportarRankingPDF() {
+      if (!rankingListaAtual.length) { return; }
+      const titulos = { geral: 'Ranking Geral FIKARJ', M: 'Ranking Geral Masculino', F: 'Ranking Geral Feminino', assoc: 'Ranking Geral da Associação ' + $('selAssocRanking').value };
+      const linhas = rankingListaAtual.map(a => ({
+        pos: a[rankingCampoPosAtual] + 'º',
+        nome: a.nome,
+        associacao: a.associacao || '',
+        pontos: a.ranking_pontos ?? 0,
+        ouro: a.ranking_ouro ?? 0,
+        prata: a.ranking_prata ?? 0,
+        bronze: a.ranking_bronze ?? 0
+      }));
+      const colunas = [
+        { titulo: 'Pos.', chave: 'pos', largura: 0.07 },
+        { titulo: 'Nome', chave: 'nome', largura: 0.34 },
+        { titulo: 'Associação', chave: 'associacao', largura: 0.18 },
+        { titulo: 'Pontos', chave: 'pontos', largura: 0.12 },
+        { titulo: 'Ouro', chave: 'ouro', largura: 0.09 },
+        { titulo: 'Prata', chave: 'prata', largura: 0.09 },
+        { titulo: 'Bronze', chave: 'bronze', largura: 0.11 }
+      ];
+      const ult = rankingListaAtual[0].ranking_atualizado_em;
+      const subtitulo = 'FIKARJ 2026 · ' + (ult ? 'atualizado em ' + ult.split('-').reverse().join('/') : 'gerado em ' + new Date().toLocaleDateString('pt-BR'));
+      const nomeArq = 'Ranking_FIKARJ_' + abaRankingAtual + (abaRankingAtual === 'assoc' ? '_' + $('selAssocRanking').value : '') + '.pdf';
+      gerarPDFLista(titulos[abaRankingAtual], subtitulo, colunas, linhas, nomeArq);
     }
 
     // ---- PDF em lote ----
