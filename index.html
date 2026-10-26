@@ -63,6 +63,7 @@
       <p id="rankingTextoGeral" class="hidden text-white font-bold"></p>
       <p id="rankingTextoAssocMisto" class="hidden text-white font-bold"></p>
       <p id="rankingTextoAssoc" class="hidden text-white font-bold"></p>
+      <p id="rankingTexto60" class="hidden text-white font-bold"></p>
       <p id="rankingMedalhas" class="text-gray-400 text-xs mt-1"></p>
     </div>
     <div id="avisoInativo" class="hidden w-full max-w-xl bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-4 text-sm text-center mb-6"></div>
@@ -192,7 +193,8 @@
       const txtGeral = document.getElementById('rankingTextoGeral');
       const txtAssocMisto = document.getElementById('rankingTextoAssocMisto');
       const txtAssoc = document.getElementById('rankingTextoAssoc');
-      const temRanking = linha.ranking_pos_geral || linha.ranking_pos || linha.ranking_pos_assoc_geral || linha.ranking_pos_assoc;
+      const txt60 = document.getElementById('rankingTexto60');
+      const temRanking = linha.ranking_pos_geral || linha.ranking_pos || linha.ranking_pos_assoc_geral || linha.ranking_pos_assoc || linha.ranking_pos_60;
       if (temRanking) {
         const categoria = linha.sexo === 'F' ? 'feminino' : 'masculino';
         rb.classList.remove('hidden');
@@ -219,6 +221,12 @@
           txtAssoc.textContent = linha.ranking_pos_assoc + 'º lugar no ranking ' + categoria + ' da sua associação';
         } else {
           txtAssoc.classList.add('hidden');
+        }
+        if (linha.ranking_pos_60) {
+          txt60.classList.remove('hidden');
+          txt60.textContent = linha.ranking_pos_60 + 'º lugar no ranking 60+ · ' + (linha.ranking_pontos_60 ?? 0) + ' pontos';
+        } else {
+          txt60.classList.add('hidden');
         }
         document.getElementById('rankingMedalhas').textContent = '🥇 ' + (linha.ranking_ouro || 0) + '   🥈 ' + (linha.ranking_prata || 0) + '   🥉 ' + (linha.ranking_bronze || 0) + (linha.ranking_atualizado_em ? '  ·  atualizado em ' + linha.ranking_atualizado_em.split('-').reverse().join('/') : '');
       } else {

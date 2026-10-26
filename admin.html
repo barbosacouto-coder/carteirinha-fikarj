@@ -162,6 +162,7 @@
         <button id="abaRankM" onclick="trocarAbaRanking('M')" class="px-3 py-2 rounded-lg font-semibold">Masculino</button>
         <button id="abaRankF" onclick="trocarAbaRanking('F')" class="px-3 py-2 rounded-lg font-semibold">Feminino</button>
         <button id="abaRankAssoc" onclick="trocarAbaRanking('assoc')" class="px-3 py-2 rounded-lg font-semibold">Por associação</button>
+        <button id="abaRank60" onclick="trocarAbaRanking('60')" class="px-3 py-2 rounded-lg font-semibold">60+</button>
         <select id="selAssocRanking" onchange="renderRanking()" class="inp hidden" style="max-width:220px"></select>
       </div>
       <p id="rankingAtualizadoEm" class="text-[11px] text-gray-500 mb-2 min-h-[1rem]"></p>
@@ -201,6 +202,7 @@
         <p id="rankingAdminGeral" class="hidden text-white font-bold"></p>
         <p id="rankingAdminAssocMisto" class="hidden text-white font-bold"></p>
         <p id="rankingAdminAssoc" class="hidden text-white font-bold"></p>
+        <p id="rankingAdmin60" class="hidden text-white font-bold"></p>
         <p id="rankingAdminMedalhas" class="text-gray-400 text-xs mt-1"></p>
       </div>
       <div id="rankingAdminAviso" class="hidden max-w-xl mx-auto bg-amber-950/60 border border-amber-800 text-amber-200 rounded-xl p-3 text-xs text-center mb-4"></div>
@@ -423,8 +425,8 @@
       return linhaParaAtleta({ ...a, associacao_nome: mapNome()[a.associacao] });
     }
     function mostrarRankingAdmin(a) {
-      const rb = $('rankingAdmin'), txtGeralMisto = $('rankingAdminGeralMisto'), txtGeral = $('rankingAdminGeral'), txtAssocMisto = $('rankingAdminAssocMisto'), txtAssoc = $('rankingAdminAssoc'), aviso = $('rankingAdminAviso');
-      const temRanking = a.ranking_pos_geral || a.ranking_pos || a.ranking_pos_assoc_geral || a.ranking_pos_assoc;
+      const rb = $('rankingAdmin'), txtGeralMisto = $('rankingAdminGeralMisto'), txtGeral = $('rankingAdminGeral'), txtAssocMisto = $('rankingAdminAssocMisto'), txtAssoc = $('rankingAdminAssoc'), txt60 = $('rankingAdmin60'), aviso = $('rankingAdminAviso');
+      const temRanking = a.ranking_pos_geral || a.ranking_pos || a.ranking_pos_assoc_geral || a.ranking_pos_assoc || a.ranking_pos_60;
       if (!temRanking) {
         rb.classList.add('hidden');
         aviso.classList.add('hidden');
@@ -465,6 +467,12 @@
       } else {
         txtAssoc.classList.add('hidden');
       }
+      if (a.ranking_pos_60) {
+        txt60.classList.remove('hidden');
+        txt60.textContent = a.ranking_pos_60 + 'º lugar no ranking 60+ · ' + (a.ranking_pontos_60 ?? 0) + ' pontos';
+      } else {
+        txt60.classList.add('hidden');
+      }
       $('rankingAdminMedalhas').textContent = '🥇 ' + (a.ranking_ouro || 0) + '   🥈 ' + (a.ranking_prata || 0) + '   🥉 ' + (a.ranking_bronze || 0) + (a.ranking_atualizado_em ? '  ·  atualizado em ' + a.ranking_atualizado_em.split('-').reverse().join('/') : '');
     }
     function verCartao() {
@@ -483,7 +491,7 @@
     }
     function trocarAbaRanking(aba) {
       abaRankingAtual = aba;
-      const ids = { geral: 'abaRankGeral', M: 'abaRankM', F: 'abaRankF', assoc: 'abaRankAssoc' };
+      const ids = { geral: 'abaRankGeral', M: 'abaRankM', F: 'abaRankF', assoc: 'abaRankAssoc', '60': 'abaRank60' };
       Object.entries(ids).forEach(([k, id]) => {
         $(id).className = 'px-3 py-2 rounded-lg font-semibold ' + (k === aba ? 'bg-sky-500 text-white' : 'bg-gray-800 border border-gray-700 text-gray-200');
       });
@@ -499,17 +507,21 @@
       } else if (abaRankingAtual === 'M' || abaRankingAtual === 'F') {
         lista = atletas.filter(a => a.sexo === abaRankingAtual && a.ranking_pos).sort((x, y) => x.ranking_pos - y.ranking_pos);
         campoPos = 'ranking_pos';
+      } else if (abaRankingAtual === '60') {
+        lista = atletas.filter(a => a.ranking_pos_60).sort((x, y) => x.ranking_pos_60 - y.ranking_pos_60);
+        campoPos = 'ranking_pos_60';
       } else {
         const as = $('selAssocRanking').value;
         lista = atletas.filter(a => a.associacao === as && a.ranking_pos_assoc_geral).sort((x, y) => x.ranking_pos_assoc_geral - y.ranking_pos_assoc_geral);
         campoPos = 'ranking_pos_assoc_geral';
       }
       rankingListaAtual = lista; rankingCampoPosAtual = campoPos;
+      const suf = abaRankingAtual === '60' ? '_60' : '';
       const tb = $('tbodyRanking'); tb.innerHTML = '';
       lista.forEach(a => {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td class="p-2 font-mono text-gray-300">${a[campoPos]}º</td><td class="p-2 font-semibold text-gray-100">${a.nome}</td><td class="p-2 text-gray-400">${a.associacao || ''}</td>` +
-          `<td class="p-2 text-gray-300">${a.ranking_pontos ?? 0}</td><td class="p-2 text-gray-300">${a.ranking_ouro ?? 0}</td><td class="p-2 text-gray-300">${a.ranking_prata ?? 0}</td><td class="p-2 text-gray-300">${a.ranking_bronze ?? 0}</td>`;
+          `<td class="p-2 text-gray-300">${a['ranking_pontos' + suf] ?? 0}</td><td class="p-2 text-gray-300">${a['ranking_ouro' + suf] ?? 0}</td><td class="p-2 text-gray-300">${a['ranking_prata' + suf] ?? 0}</td><td class="p-2 text-gray-300">${a['ranking_bronze' + suf] ?? 0}</td>`;
         tb.appendChild(tr);
       });
       $('rodapeRanking').textContent = lista.length + ' atleta(s) classificado(s).';
@@ -589,15 +601,16 @@
     }
     function exportarRankingPDF() {
       if (!rankingListaAtual.length) { return; }
-      const titulos = { geral: 'Ranking Geral FIKARJ', M: 'Ranking Geral Masculino', F: 'Ranking Geral Feminino', assoc: 'Ranking Geral da Associação ' + $('selAssocRanking').value };
+      const titulos = { geral: 'Ranking Geral FIKARJ', M: 'Ranking Geral Masculino', F: 'Ranking Geral Feminino', assoc: 'Ranking Geral da Associação ' + $('selAssocRanking').value, '60': 'Ranking 60+ (geral, masculino e feminino juntos)' };
+      const sufExp = abaRankingAtual === '60' ? '_60' : '';
       const linhas = rankingListaAtual.map(a => ({
         pos: a[rankingCampoPosAtual] + 'º',
         nome: a.nome,
         associacao: a.associacao || '',
-        pontos: a.ranking_pontos ?? 0,
-        ouro: a.ranking_ouro ?? 0,
-        prata: a.ranking_prata ?? 0,
-        bronze: a.ranking_bronze ?? 0
+        pontos: a['ranking_pontos' + sufExp] ?? 0,
+        ouro: a['ranking_ouro' + sufExp] ?? 0,
+        prata: a['ranking_prata' + sufExp] ?? 0,
+        bronze: a['ranking_bronze' + sufExp] ?? 0
       }));
       const colunas = [
         { titulo: 'Pos.', chave: 'pos', largura: 0.07 },
@@ -688,11 +701,13 @@
       return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim().replace(/\s+/g, ' ');
     }
     let pendRanking = null;
+    let pendRankingTem60 = false;
     async function lerRanking(ev) {
       const f = ev.target.files[0]; ev.target.value = '';
       if (!f) return;
       const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
       const wsAtletas = wb.Sheets['Atletas'], wsCadastro = wb.Sheets['Cadastro'];
+      const ws60 = wb.Sheets['Ranking 60+ em dia'] || wb.Sheets['Ranking 60+'];
       if (!wsAtletas || !wsCadastro) { alert('A planilha precisa ter as abas "Atletas" e "Cadastro" (exportação padrão do painel de ranqueamento).'); return; }
       const cad = XLSX.utils.sheet_to_json(wsCadastro, { defval: null });
       const nomeParaReg = new Map();
@@ -739,12 +754,47 @@
         const [sx, as] = ch.split('|');
         brutos.filter(p => p.sexo === sx && p.associacao === as).sort(desempate).forEach((p, i) => { p.ranking_pos_assoc = i + 1; });
       });
+      // 5. ranking 60+ (geral, ambos os sexos juntos): lido da aba separada "Ranking 60+ em dia" (ou "Ranking 60+" se a outra não existir), com pontuação própria de 60+, não a pontuação geral do circuito
+      const semCorresp60 = [], naoCadastrados60 = [], inativos60 = [];
+      let qtd60 = 0;
+      const porReg60 = new Map(brutos.map(p => [p.registro, p]));
+      if (ws60) {
+        const linhas60 = XLSX.utils.sheet_to_json(ws60, { defval: null });
+        const itens60 = [];
+        linhas60.forEach(l => {
+          const nome = l['Atleta']; if (!nome) return;
+          const reg = nomeParaReg.get(normNome(nome));
+          if (reg == null) { semCorresp60.push(nome); return; }
+          const at = porReg.get(reg);
+          if (!at) { naoCadastrados60.push(`${nome} (reg. ${reg})`); return; }
+          if (!ativo(at)) { inativos60.push(`${nome} (reg. ${reg})`); return; }
+          itens60.push({
+            registro: reg, nome,
+            ranking_pontos_60: parseInt(l['Pontos'], 10) || 0,
+            ranking_ouro_60: parseInt(l['Ouro'], 10) || 0,
+            ranking_prata_60: parseInt(l['Prata'], 10) || 0,
+            ranking_bronze_60: parseInt(l['Bronze'], 10) || 0,
+            ranking_quarto_60: parseInt(l['4º'], 10) || 0,
+            ranking_eventos_60: l['Eventos'] || null
+          });
+        });
+        const desempate60 = (a, b) => b.ranking_pontos_60 - a.ranking_pontos_60 || b.ranking_ouro_60 - a.ranking_ouro_60 || b.ranking_prata_60 - a.ranking_prata_60 || b.ranking_bronze_60 - a.ranking_bronze_60 || a.nome.localeCompare(b.nome);
+        itens60.sort(desempate60).forEach((p, i) => { p.ranking_pos_60 = i + 1; });
+        qtd60 = itens60.length;
+        itens60.forEach(p60 => {
+          let alvo = porReg60.get(p60.registro);
+          if (!alvo) { alvo = { registro: p60.registro, nome: p60.nome }; brutos.push(alvo); porReg60.set(p60.registro, alvo); }
+          alvo.ranking_pos_60 = p60.ranking_pos_60; alvo.ranking_pontos_60 = p60.ranking_pontos_60; alvo.ranking_ouro_60 = p60.ranking_ouro_60;
+          alvo.ranking_prata_60 = p60.ranking_prata_60; alvo.ranking_bronze_60 = p60.ranking_bronze_60; alvo.ranking_quarto_60 = p60.ranking_quarto_60; alvo.ranking_eventos_60 = p60.ranking_eventos_60;
+        });
+      }
       const soAssocNomes = brutos.filter(p => p.soAssoc).map(p => `${p.nome} (reg. ${p.registro})`);
       const payload = brutos.map(p => {
         const { nome, sexo, associacao, soAssoc, ...resto } = p;
-        return { ...resto, ranking_pos_geral: p.ranking_pos_geral || null, ranking_pos: p.ranking_pos || null, ranking_pos_assoc_geral: p.ranking_pos_assoc_geral || null, ranking_pos_assoc: p.ranking_pos_assoc || null };
+        return { ...resto, ranking_pos_geral: p.ranking_pos_geral || null, ranking_pos: p.ranking_pos || null, ranking_pos_assoc_geral: p.ranking_pos_assoc_geral || null, ranking_pos_assoc: p.ranking_pos_assoc || null, ranking_pos_60: p.ranking_pos_60 || null };
       });
       pendRanking = payload;
+      pendRankingTem60 = !!ws60;
       const lista = (t, arr) => `<p><b>${arr.length}</b> ${t}${arr.length ? ': <span class="text-gray-400">' + arr.slice(0, 6).join('; ') + (arr.length > 6 ? '…' : '') + '</span>' : ''}</p>`;
       $('resumoImpRank').innerHTML = lista('atleta(s) receberão o ranking atualizado (4 posições: geral FIKARJ, geral por sexo, geral da associação e por sexo na associação, só entre quem está com anuidade em dia)', payload.map(p => p.registro)) +
         lista('nome(s) da planilha sem correspondência na aba "Cadastro" (não foram importados)', semCorrespCadastro) +
@@ -752,6 +802,11 @@
         lista('atleta(s) com pódio mas anuidade inativa (não entram no ranking individual)', inativosExcluidos) +
         lista('atleta(s) marcados com exceção "só associação" (contam só no ranking por sexo da associação; ficam fora do geral FIKARJ, geral por sexo e geral da associação)', soAssocNomes) +
         lista('atleta(s) com pódio mas SEM SEXO cadastrado no painel (estatísticas serão salvas, mas sem posição no ranking até o sexo ser preenchido em "Editar atleta")', semSexo) +
+        (ws60 ? lista('atleta(s) receberão posição no ranking 60+ (geral, masculino e feminino juntos, só com anuidade em dia)', Array.from({ length: qtd60 })) +
+          lista('nome(s) da aba de 60+ sem correspondência na aba "Cadastro" (não entraram no ranking 60+)', semCorresp60) +
+          lista('atleta(s) do ranking 60+ ainda não cadastrados no Portal Ficast (não entraram no ranking 60+)', naoCadastrados60) +
+          lista('atleta(s) do ranking 60+ com anuidade inativa (não entram no ranking 60+)', inativos60)
+          : '<p class="text-gray-500">A planilha não trouxe a aba "Ranking 60+ em dia" (nem "Ranking 60+") — a posição no ranking 60+ não será alterada nesta importação.</p>') +
         '<p class="text-amber-300 pt-2">Atenção: todos os demais atletas (que não aparecem na planilha, ou cuja anuidade não está em dia) terão o ranking individual limpo/zerado nesta importação.</p>';
       $('f_rankData').value = new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = !payload.length;
@@ -760,10 +815,13 @@
     async function confirmarImportRanking() {
       const data = $('f_rankData').value || new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = true;
-      const limpar = await sb.from('atletas').update({
+      const limparCampos = {
         ranking_pos_geral: null, ranking_pos: null, ranking_pos_assoc_geral: null, ranking_pos_assoc: null, ranking_pontos: null, ranking_ouro: null, ranking_prata: null,
         ranking_bronze: null, ranking_quarto: null, ranking_eventos: null, ranking_modalidades: null, ranking_atualizado_em: null
-      }).gt('id', 0);
+      };
+      // só zera o ranking 60+ de todo mundo quando a planilha importada trouxe a aba de 60+; senão mantém o que já estava lá
+      if (pendRankingTem60) Object.assign(limparCampos, { ranking_pos_60: null, ranking_pontos_60: null, ranking_ouro_60: null, ranking_prata_60: null, ranking_bronze_60: null, ranking_quarto_60: null, ranking_eventos_60: null });
+      const limpar = await sb.from('atletas').update(limparCampos).gt('id', 0);
       if (limpar.error) { alert('Erro ao limpar ranking anterior: ' + limpar.error.message); $('btnConfImpRank').disabled = false; return; }
       const linhas = pendRanking.map(p => ({ ...p, ranking_atualizado_em: data }));
       for (let i = 0; i < linhas.length; i += 100) {
