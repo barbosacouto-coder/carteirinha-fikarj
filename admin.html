@@ -38,6 +38,7 @@
         <label class="cursor-pointer bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Importar planilha<input type="file" accept=".xlsx,.xls" class="hidden" onchange="lerPlanilha(event)"></label>
         <label class="cursor-pointer bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Importar ranking<input type="file" accept=".xlsx,.xls" class="hidden" onchange="lerRanking(event)"></label>
         <button onclick="abrirRanking()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Ver rankings</button>
+        <button onclick="abrirFotosPendentes()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Fotos pendentes<span id="badgeFotosPendentes" class="hidden ml-1 bg-amber-500 text-black rounded-full px-1.5 text-[10px] font-bold"></span></button>
         <button onclick="sair()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3 py-2 rounded-lg">Sair</button>
       </div>
     </div>
@@ -87,6 +88,18 @@
         <div><label class="lbl">Sexo (para ranking)</label><select id="f_sexo" class="inp"><option value="">— não informado —</option><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
         <div><label class="lbl">Registro CNKB</label><input id="f_cnkb" class="inp" placeholder="Nº 1829"></div>
         <div class="md:col-span-2"><label class="lbl">Cargo na Federação</label><input id="f_cargo" class="inp" placeholder="(vazio se não tiver)"></div>
+        <div class="md:col-span-2 bg-gray-950/60 border border-gray-800 rounded-lg p-3 flex items-start gap-3">
+          <img id="f_fotoPreview" class="hidden w-14 h-[70px] object-cover rounded-lg border border-gray-700 flex-shrink-0" alt="Foto do atleta">
+          <div class="flex-1 min-w-0">
+            <label class="lbl">Foto na carteirinha</label>
+            <p id="f_fotoStatus" class="text-xs text-gray-500 mb-2">Nenhuma foto enviada.</p>
+            <div class="flex flex-wrap gap-2 items-center">
+              <input id="f_fotoInput" type="file" accept="image/jpeg,image/png" class="text-xs text-gray-300">
+              <button type="button" id="btnRemoverFoto" onclick="removerFotoAtleta()" class="hidden text-xs text-red-400 hover:text-red-300 underline">Remover foto</button>
+            </div>
+            <p id="f_fotoMsg" class="text-xs text-red-400 min-h-[1rem] mt-1"></p>
+          </div>
+        </div>
         <div class="md:col-span-2 bg-amber-950/40 border border-amber-900 rounded-lg p-3">
           <label class="flex items-start gap-2 text-xs text-amber-200 cursor-pointer">
             <input type="checkbox" id="f_ranking_so_assoc" class="mt-0.5">
@@ -165,6 +178,19 @@
     </div>
   </div>
 
+  <!-- FOTOS PENDENTES -->
+  <div id="modalFotos" class="hidden fixed inset-0 bg-black/70 z-40 overflow-y-auto p-4">
+    <div class="max-w-3xl mx-auto bg-gray-900 border border-gray-700 rounded-2xl p-5 mt-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-white font-bold">Fotos pendentes de aprovação</h2>
+        <button onclick="document.getElementById('modalFotos').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Fechar</button>
+      </div>
+      <p class="text-gray-500 text-xs mb-3">Fotos enviadas pelos próprios atletas pela tela pública. Só aparecem na carteirinha depois de aprovadas aqui.</p>
+      <div id="listaFotosPendentes" class="space-y-2"></div>
+      <p id="semFotosPendentes" class="hidden text-gray-500 text-xs text-center py-6">Nenhuma foto pendente no momento.</p>
+    </div>
+  </div>
+
   <!-- CARTEIRINHA (visualização / geração de PDF) -->
   <div id="modalCartao" class="hidden fixed inset-0 bg-black/80 z-50 overflow-auto p-4">
     <div class="max-w-6xl mx-auto">
@@ -230,6 +256,7 @@
       $('f_associacao').innerHTML = opts;
       $('fAssoc').innerHTML = '<option value="">Todas as associações</option>' + assocs.map(s => `<option value="${s.sigla}">${s.sigla} (${atletas.filter(x => x.associacao === s.sigla).length})</option>`).join('');
       filtrar();
+      atualizarBadgeFotos();
     }
 
     let listaFiltradaAtual = [];
@@ -270,7 +297,99 @@
       campos.forEach(c => { $('f_' + c).value = a ? (c === 'cpf' ? fmtCpf(a.cpf) : (a[c] ?? '')) : (c === 'anuidade' ? 'Inativo' : ''); });
       $('f_ranking_so_assoc').checked = a ? !!a.ranking_so_assoc : false;
       $('btnExcluir').classList.toggle('hidden', !a);
+      $('f_fotoMsg').textContent = '';
+      atualizarFotoPreviewAdmin(a);
       $('modal').classList.remove('hidden');
+    }
+
+    // ---- foto do atleta (upload direto pelo admin) ----
+    function atualizarFotoPreviewAdmin(a) {
+      const img = $('f_fotoPreview'), statusEl = $('f_fotoStatus'), btnRem = $('btnRemoverFoto'), input = $('f_fotoInput');
+      if (!a) {
+        img.classList.add('hidden'); img.removeAttribute('src');
+        statusEl.textContent = 'Salve o atleta antes de enviar uma foto.';
+        btnRem.classList.add('hidden');
+        input.disabled = true;
+        return;
+      }
+      input.disabled = false;
+      if (a.foto_url) {
+        img.src = FOTOS_BASE_URL + a.foto_url + '?t=' + Date.now();
+        img.classList.remove('hidden');
+      } else {
+        img.classList.add('hidden'); img.removeAttribute('src');
+      }
+      const rotulos = { pendente: 'Pendente de aprovação (enviada pelo próprio atleta)', aprovada: 'Aprovada — aparece na carteirinha', rejeitada: 'Rejeitada' + (a.foto_motivo_rejeicao ? ': ' + a.foto_motivo_rejeicao : '') };
+      statusEl.textContent = a.foto_status ? rotulos[a.foto_status] : 'Nenhuma foto enviada.';
+      btnRem.classList.toggle('hidden', !a.foto_url);
+    }
+    $('f_fotoInput').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file || !editando) return;
+      const msg = $('f_fotoMsg'); msg.textContent = '';
+      if (!['image/jpeg', 'image/png'].includes(file.type)) { msg.textContent = 'Formato inválido. Envie JPG ou PNG.'; return; }
+      if (file.size > 1048576) { msg.textContent = 'Arquivo muito grande (máx. 1MB).'; return; }
+      const ext = file.type === 'image/png' ? 'png' : 'jpg';
+      const path = editando.id + '.' + ext;
+      const up = await sb.storage.from('fotos-atletas').upload(path, file, { contentType: file.type, upsert: true });
+      if (up.error) { msg.textContent = 'Erro ao enviar: ' + up.error.message; return; }
+      const upd = await sb.from('atletas').update({ foto_url: path, foto_status: 'aprovada', foto_enviada_em: new Date().toISOString(), foto_motivo_rejeicao: null }).eq('id', editando.id);
+      if (upd.error) { msg.textContent = 'Erro ao salvar: ' + upd.error.message; return; }
+      editando = { ...editando, foto_url: path, foto_status: 'aprovada', foto_motivo_rejeicao: null };
+      const idx = atletas.findIndex(x => x.id === editando.id);
+      if (idx >= 0) atletas[idx] = editando;
+      atualizarFotoPreviewAdmin(editando);
+      atualizarBadgeFotos();
+    });
+    async function removerFotoAtleta() {
+      if (!editando || !editando.foto_url) return;
+      const msg = $('f_fotoMsg'); msg.textContent = '';
+      const upd = await sb.from('atletas').update({ foto_url: null, foto_status: null, foto_motivo_rejeicao: null }).eq('id', editando.id);
+      if (upd.error) { msg.textContent = 'Erro ao remover: ' + upd.error.message; return; }
+      editando = { ...editando, foto_url: null, foto_status: null, foto_motivo_rejeicao: null };
+      const idx = atletas.findIndex(x => x.id === editando.id);
+      if (idx >= 0) atletas[idx] = editando;
+      atualizarFotoPreviewAdmin(editando);
+      atualizarBadgeFotos();
+    }
+    function atualizarBadgeFotos() {
+      const n = atletas.filter(a => a.foto_status === 'pendente').length;
+      const b = $('badgeFotosPendentes');
+      b.textContent = n; b.classList.toggle('hidden', !n);
+    }
+    function abrirFotosPendentes() {
+      const pendentes = atletas.filter(a => a.foto_status === 'pendente');
+      const lista = $('listaFotosPendentes'); lista.innerHTML = '';
+      $('semFotosPendentes').classList.toggle('hidden', !!pendentes.length);
+      pendentes.forEach(a => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-3 bg-gray-950/60 border border-gray-800 rounded-lg p-3';
+        row.innerHTML = `<img src="${FOTOS_BASE_URL}${a.foto_url}" class="w-14 h-[70px] object-cover rounded-lg border border-gray-700 flex-shrink-0" alt="">
+          <div class="flex-1 min-w-0"><p class="text-gray-100 font-semibold text-sm truncate">${a.nome}</p><p class="text-gray-500 text-xs">Reg. ${a.registro == null ? '-' : String(a.registro).padStart(4, '0')} · ${a.associacao || ''}</p></div>
+          <div class="flex gap-2 flex-shrink-0"><button class="bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg">Aprovar</button><button class="bg-red-700 hover:bg-red-600 text-white text-xs font-bold px-3 py-2 rounded-lg">Rejeitar</button></div>`;
+        const [btnAprovar, btnRejeitar] = row.querySelectorAll('button');
+        btnAprovar.onclick = () => aprovarFoto(a);
+        btnRejeitar.onclick = () => rejeitarFoto(a);
+        lista.appendChild(row);
+      });
+      $('modalFotos').classList.remove('hidden');
+    }
+    async function aprovarFoto(a) {
+      const r = await sb.from('atletas').update({ foto_status: 'aprovada', foto_motivo_rejeicao: null }).eq('id', a.id);
+      if (r.error) { alert('Erro ao aprovar: ' + r.error.message); return; }
+      a.foto_status = 'aprovada'; a.foto_motivo_rejeicao = null;
+      atualizarBadgeFotos();
+      abrirFotosPendentes();
+    }
+    async function rejeitarFoto(a) {
+      const motivo = prompt('Motivo da rejeição (o atleta vai ver esta mensagem; pode deixar em branco):', '');
+      if (motivo === null) return;
+      const r = await sb.from('atletas').update({ foto_status: 'rejeitada', foto_motivo_rejeicao: motivo || null }).eq('id', a.id);
+      if (r.error) { alert('Erro ao rejeitar: ' + r.error.message); return; }
+      a.foto_status = 'rejeitada'; a.foto_motivo_rejeicao = motivo || null;
+      atualizarBadgeFotos();
+      abrirFotosPendentes();
     }
     const novo = () => abrir(null);
     const fechar = () => $('modal').classList.add('hidden');
@@ -352,7 +471,7 @@
       if (!editando) { $('msgModal').textContent = 'Salve o atleta antes de ver a carteirinha.'; return; }
       $('modalCartao').classList.remove('hidden');
       mostrarRankingAdmin(editando);
-      renderizarCartao(paraCartao(editando));
+      renderizarCartao(paraCartao(editando)).then(ajustarEscalaCartoes);
     }
 
     // ---- visualizar rankings ----

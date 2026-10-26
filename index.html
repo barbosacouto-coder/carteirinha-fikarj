@@ -67,6 +67,20 @@
     </div>
     <div id="avisoInativo" class="hidden w-full max-w-xl bg-red-950/60 border border-red-800 text-red-200 rounded-xl p-4 text-sm text-center mb-6"></div>
     <div id="cartaoMount"></div>
+
+    <div id="fotoSecao" class="hidden w-full max-w-xl bg-gray-900/80 border border-gray-800 rounded-xl p-4 text-sm mt-6">
+      <p class="text-gray-200 font-bold mb-1">Foto na carteirinha (opcional)</p>
+      <p class="text-gray-500 text-xs mb-3">Envie uma foto de rosto, nítida, com fundo claro — como em documento de identidade. Formatos aceitos: JPG ou PNG, até 1MB. Sua foto só aparecerá na carteirinha depois de aprovada pela federação.</p>
+      <p id="fotoStatusMsg" class="text-xs mb-3 min-h-[1rem]"></p>
+      <div id="fotoAtualPreview" class="hidden mb-3">
+        <img id="fotoAtualImg" class="w-20 h-24 object-cover rounded-lg border border-gray-700" alt="Sua foto enviada">
+      </div>
+      <form id="formFoto" class="space-y-2">
+        <input id="fotoInput" type="file" accept="image/jpeg,image/png" class="text-xs text-gray-300 block">
+        <p id="fotoErro" class="text-xs text-red-400 min-h-[1rem]"></p>
+        <button id="btnEnviarFoto" type="submit" class="bg-sky-500 hover:bg-sky-600 text-white font-bold px-4 py-2 rounded-xl text-xs">Enviar foto</button>
+      </form>
+    </div>
   </section>
 
   <script src="config.js"></script>
@@ -74,7 +88,7 @@
   <script>
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
     montarCartao('cartaoMount');
-    let atual = null;
+    let atual = null, cpfAtual = null, nascAtual = null;
 
     const cpfEl = document.getElementById('cpf');
     cpfEl.addEventListener('input', () => {
@@ -99,7 +113,73 @@
         return;
       }
       if (!data) { mensagem('CPF ou data de nascimento não conferem com o cadastro.', true); return; }
+      cpfAtual = cpfEl.value.replace(/\D/g, '');
+      nascAtual = document.getElementById('nasc').value;
       mostrar(data);
+    });
+
+    function atualizarFotoUI(linha) {
+      const statusEl = document.getElementById('fotoStatusMsg');
+      const prevBox = document.getElementById('fotoAtualPreview');
+      const prevImg = document.getElementById('fotoAtualImg');
+      const status = linha.foto_status;
+      if (status === 'pendente') {
+        statusEl.textContent = 'Sua foto foi enviada e está em análise pela federação.';
+        statusEl.className = 'text-xs mb-3 min-h-[1rem] text-amber-400';
+      } else if (status === 'aprovada') {
+        statusEl.textContent = 'Sua foto foi aprovada e já aparece na carteirinha.';
+        statusEl.className = 'text-xs mb-3 min-h-[1rem] text-green-400';
+      } else if (status === 'rejeitada') {
+        statusEl.textContent = 'Sua foto foi recusada' + (linha.foto_motivo_rejeicao ? ': ' + linha.foto_motivo_rejeicao : '.') + ' Envie outra, se quiser.';
+        statusEl.className = 'text-xs mb-3 min-h-[1rem] text-red-400';
+      } else {
+        statusEl.textContent = 'Você ainda não enviou foto. É opcional.';
+        statusEl.className = 'text-xs mb-3 min-h-[1rem] text-gray-500';
+      }
+      if (linha.foto_url && (status === 'aprovada' || status === 'pendente')) {
+        prevImg.src = FOTOS_BASE_URL + linha.foto_url;
+        prevBox.classList.remove('hidden');
+      } else {
+        prevBox.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('formFoto').addEventListener('submit', async e => {
+      e.preventDefault();
+      const erroEl = document.getElementById('fotoErro');
+      erroEl.textContent = '';
+      const file = document.getElementById('fotoInput').files[0];
+      if (!file) { erroEl.textContent = 'Escolha um arquivo.'; return; }
+      if (!['image/jpeg', 'image/png'].includes(file.type)) { erroEl.textContent = 'Formato inválido. Envie JPG ou PNG.'; return; }
+      if (file.size > 1048576) { erroEl.textContent = 'Arquivo muito grande. O limite é 1MB.'; return; }
+      const btn = document.getElementById('btnEnviarFoto');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      try {
+        const b64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(String(r.result).split(',')[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        const resp = await fetch(SUPABASE_URL + '/functions/v1/upload-foto', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cpf: cpfAtual, nascimento: nascAtual, mime: file.type, foto_base64: b64 })
+        });
+        const out = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          const msgs = { muitas_tentativas: 'Muitas tentativas. Aguarde 15 minutos e tente novamente.', foto_muito_grande: 'Arquivo muito grande (máx. 1MB).', formato_invalido: 'Formato inválido. Envie JPG ou PNG.', nao_encontrado: 'Não foi possível confirmar sua identidade. Saia e faça login novamente.' };
+          erroEl.textContent = msgs[out.error] || 'Não foi possível enviar a foto agora. Tente novamente.';
+        } else {
+          document.getElementById('fotoInput').value = '';
+          atualizarFotoUI({ foto_status: 'pendente', foto_url: null });
+          document.getElementById('fotoStatusMsg').textContent = 'Foto enviada! Ela será exibida na carteirinha após a aprovação da federação.';
+          document.getElementById('fotoStatusMsg').className = 'text-xs mb-3 min-h-[1rem] text-amber-400';
+        }
+      } catch (err) {
+        erroEl.textContent = 'Erro ao enviar. Verifique sua conexão e tente novamente.';
+      }
+      btn.disabled = false; btn.textContent = 'Enviar foto';
     });
 
     function mostrar(linha) {
@@ -150,7 +230,11 @@
       aviso.classList.toggle('hidden', ativo);
       aviso.textContent = 'Sua anuidade consta como inativa. Procure a sua associação ou a FIKARJ para regularizar e emitir a carteirinha.';
       document.getElementById('cartaoMount').classList.toggle('hidden', !ativo);
-      if (ativo) { renderizarCartao(atual); ajustarEscalaCartoes(); }
+      document.getElementById('fotoSecao').classList.toggle('hidden', !ativo);
+      if (ativo) {
+        renderizarCartao(atual).then(ajustarEscalaCartoes);
+        atualizarFotoUI(linha);
+      }
     }
 
     async function baixar() {
@@ -161,7 +245,7 @@
     }
 
     function sair() {
-      atual = null;
+      atual = null; cpfAtual = null; nascAtual = null;
       document.getElementById('formLogin').reset();
       mensagem('', false);
       document.getElementById('telaCartao').classList.add('hidden');
