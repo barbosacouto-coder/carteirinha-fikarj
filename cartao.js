@@ -215,6 +215,10 @@ async function renderizarCartao(atleta) {
   ajustarTodosTextos();
 }
 
+// O html2canvas desenha o texto mais baixo que o navegador; este ajuste vale so na copia usada para o PDF.
+const AJUSTE_TEXTO_PDF = '.nomeb{padding:0 9px 6px!important}.cargo{padding:0 9px 4px!important}.tarja{padding:1px 11px 5px!important}.val{position:relative;top:-3px}.lab{position:relative;top:-1px}.t1,.t2,.t3,.reg,.titulo{position:relative;top:-1px}';
+function aoClonarParaPDF(doc) { const st = doc.createElement('style'); st.textContent = AJUSTE_TEXTO_PDF; doc.head.appendChild(st); }
+
 async function gerarPDFCartoes(lista, nomeArquivo, aoProgredir) {
   // lista: atletas no formato do cartao; um por pagina A4 paisagem, frente e verso lado a lado
   const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
@@ -224,8 +228,8 @@ async function gerarPDFCartoes(lista, nomeArquivo, aoProgredir) {
     if (aoProgredir) aoProgredir(i + 1, lista.length);
     await renderizarCartao(lista[i]);
     await new Promise(r => setTimeout(r, 200));
-    const frente = await html2canvas(document.getElementById('cardFront'), { scale: 3, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1300 });
-    const verso = await html2canvas(document.getElementById('cardBack'), { scale: 3, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1300 });
+    const frente = await html2canvas(document.getElementById('cardFront'), { scale: 3, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1300, onclone: aoClonarParaPDF });
+    const verso = await html2canvas(document.getElementById('cardBack'), { scale: 3, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1300, onclone: aoClonarParaPDF });
     if (i > 0) pdf.addPage('a4', 'landscape');
     pdf.addImage(frente.toDataURL('image/jpeg', 0.95), 'JPEG', 13, 50, 130, 82.1);
     pdf.addImage(verso.toDataURL('image/jpeg', 0.95), 'JPEG', 154, 50, 130, 82.1);
