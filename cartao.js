@@ -175,7 +175,7 @@ async function renderizarCartao(atleta) {
     $(id).querySelector('.fundo').innerHTML = fundoCartao(verde);
   });
 
-  $('cardReg').innerText = 'REG: Nº ' + regTxt(atleta.r);
+  $('cardReg').innerHTML = 'REG FIKARJ: <b>' + regTxt(atleta.r) + '</b>';
   $('cardNome').innerText = atleta.n;
   $('cardGrad').innerText = atleta.g || '';
   $('cardEstilo').innerText = String(atleta.e || '').replace(/^GOJU\s*RYU\s+SEIGOKAN(\s+II)?$/i, 'GOJU RYU SEIGOKAN');
