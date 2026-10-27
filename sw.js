@@ -1,7 +1,7 @@
 // Service worker do Portal FIKARJ.
 // A cada publicacao relevante, mude VERSION: o navegador detecta o sw.js diferente,
 // baixa tudo de novo e avisa o usuario para atualizar.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'fikarj-' + VERSION;
 
 const PRECACHE = [
@@ -15,6 +15,9 @@ const PRECACHE = [
   './config.js',
   './pwa.js',
   './manifest.json',
+  './manifest-admin.json',
+  './icons/admin-icon-192.png',
+  './icons/admin-icon-512.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png'
