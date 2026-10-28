@@ -1,7 +1,7 @@
 // Service worker do Portal FIKARJ.
 // A cada publicacao relevante, mude VERSION: o navegador detecta o sw.js diferente,
 // baixa tudo de novo e avisa o usuario para atualizar.
-const VERSION = 'v5';
+const VERSION = 'v6';
 const CACHE = 'fikarj-' + VERSION;
 
 const PRECACHE = [

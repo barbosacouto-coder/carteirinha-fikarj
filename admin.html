@@ -67,6 +67,12 @@
       <button id="btnLote" onclick="lote()" class="md:col-span-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-2 py-2">PDF em lote (ativos)</button>
       <button id="btnExportarLista" onclick="exportarListaPDF()" class="md:col-span-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-2 py-2">Exportar lista (PDF)</button>
     </div>
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <select id="fFoto" onchange="filtrar()" class="inp" style="width:auto">
+        <option value="">Foto: todas</option><option value="aprovada">Com foto (aprovada)</option><option value="pendente">Foto pendente</option><option value="rejeitada">Foto rejeitada</option><option value="sem">Sem foto</option>
+      </select>
+      <button id="btnExportarFotos" onclick="exportarFotosXLSX()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-3 py-2">Exportar situação das fotos (planilha)</button>
+    </div>
     <p id="aviso" class="text-xs text-sky-400 min-h-[1rem] mb-2"></p>
 
     <div class="overflow-x-auto border border-gray-800 rounded-xl">
@@ -272,17 +278,34 @@
     }
 
     let listaFiltradaAtual = [];
+    function situacaoFoto(a) { return a.foto_status || 'sem'; }
+    function exportarFotosXLSX() {
+      if (!listaFiltradaAtual.length) { $('aviso').textContent = 'Nenhum atleta para exportar.'; return; }
+      const rot = { aprovada: 'Com foto (aprovada)', pendente: 'Pendente de aprovação', rejeitada: 'Rejeitada', sem: 'Sem foto' };
+      const linhas = listaFiltradaAtual.map(a => ({
+        'Registro': a.registro == null ? '' : String(a.registro).padStart(4, '0'),
+        'Nome': a.nome, 'Associação': a.associacao, 'Graduação': a.graduacao,
+        'Situação da foto': rot[situacaoFoto(a)]
+      }));
+      const ws = XLSX.utils.json_to_sheet(linhas);
+      ws['!cols'] = [{ wch: 9 }, { wch: 42 }, { wch: 14 }, { wch: 20 }, { wch: 24 }];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Fotos');
+      XLSX.writeFile(wb, 'situacao_fotos_fikarj.xlsx');
+      $('aviso').textContent = `Planilha gerada com ${linhas.length} atleta(s).`;
+    }
     function filtrar() {
-      const t = $('busca').value.trim().toLowerCase(), td = digitos(t), as = $('fAssoc').value, st = $('fStatus').value, sx = $('fSexo').value;
+      const t = $('busca').value.trim().toLowerCase(), td = digitos(t), as = $('fAssoc').value, st = $('fStatus').value, sx = $('fSexo').value, ft = $('fFoto').value;
       const lista = atletas.filter(a =>
         (!as || a.associacao === as) &&
         (!st || (st === 'ativo') === ativo(a)) &&
         (!sx || (sx === 'sem' ? !a.sexo : a.sexo === sx)) &&
+        (!ft || situacaoFoto(a) === ft) &&
         (!t || a.nome.toLowerCase().includes(t) || String(a.registro) === t || (td.length >= 3 && (a.cpf || '').includes(td))));
       listaFiltradaAtual = lista;
       const at = atletas.filter(ativo).length;
       const semSexoAtivos = atletas.filter(a => ativo(a) && !a.sexo).length;
-      $('stats').textContent = `${atletas.length} filiados · ${at} ativos · ${atletas.length - at} inativos · ${assocs.length} associações · ${semSexoAtivos} ativo(s) sem sexo cadastrado (ficam sem posição no ranking)`;
+      $('stats').textContent = `${atletas.length} filiados · ${at} ativos · ${atletas.length - at} inativos · ${assocs.length} associações · ${semSexoAtivos} ativo(s) sem sexo cadastrado (ficam sem posição no ranking)`
+        + ` · Fotos: ${atletas.filter(a => situacaoFoto(a) === 'aprovada').length} aprovadas, ${atletas.filter(a => situacaoFoto(a) === 'pendente').length} pendentes, ${atletas.filter(a => situacaoFoto(a) === 'rejeitada').length} rejeitadas, ${atletas.filter(a => situacaoFoto(a) === 'sem').length} sem foto`;
       $('rodape').textContent = lista.length > 300 ? `Mostrando 300 de ${lista.length}. Refine a busca.` : `${lista.length} resultado(s).`;
       const tb = $('tbody'); tb.innerHTML = '';
       lista.slice(0, 300).forEach(a => {
