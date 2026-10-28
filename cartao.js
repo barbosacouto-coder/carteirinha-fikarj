@@ -219,6 +219,35 @@ async function renderizarCartao(atleta) {
 const AJUSTE_TEXTO_PDF = '.nomeb{padding:0 9px 6px!important}.cargo{padding:0 9px 4px!important}.tarja{padding:1px 11px 5px!important}.val{position:relative;top:-3px}.lab{position:relative;top:-1px}.t1,.t2,.t3,.reg,.titulo{position:relative;top:-1px}';
 function aoClonarParaPDF(doc) { const st = doc.createElement('style'); st.textContent = AJUSTE_TEXTO_PDF; doc.head.appendChild(st); }
 
+// PDF para impressao em PVC / grafica: paginas do tamanho exato do cartao (85,6 x 54 mm, padrao CR-80),
+// frente e verso em paginas seguidas (pagina impar = frente, par = verso). Divide em arquivos de 'porArquivo' atletas.
+async function gerarPDFCartoesPVC(lista, nomeBase, aoProgredir, porArquivo) {
+  porArquivo = porArquivo || 40;
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  definirEscalaCartoes(1);
+  const partes = Math.ceil(lista.length / porArquivo);
+  let feitos = 0;
+  for (let p = 0; p < partes; p++) {
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: [85.6, 54], orientation: 'landscape' });
+    const fatia = lista.slice(p * porArquivo, (p + 1) * porArquivo);
+    for (let i = 0; i < fatia.length; i++) {
+      if (aoProgredir) aoProgredir(++feitos, lista.length);
+      await renderizarCartao(fatia[i]);
+      await new Promise(r => setTimeout(r, 200));
+      const opc = { scale: 4, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1300, onclone: aoClonarParaPDF };
+      const frente = await html2canvas(document.getElementById('cardFront'), opc);
+      const verso = await html2canvas(document.getElementById('cardBack'), opc);
+      if (i > 0) pdf.addPage([85.6, 54], 'landscape');
+      pdf.addImage(frente.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 85.6, 54);
+      pdf.addPage([85.6, 54], 'landscape');
+      pdf.addImage(verso.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 85.6, 54);
+    }
+    pdf.save(partes > 1 ? nomeBase + '_parte' + (p + 1) + 'de' + partes + '.pdf' : nomeBase + '.pdf');
+    await new Promise(r => setTimeout(r, 800));
+  }
+  ajustarEscalaCartoes();
+}
+
 async function gerarPDFCartoes(lista, nomeArquivo, aoProgredir) {
   // lista: atletas no formato do cartao; um por pagina A4 paisagem, frente e verso lado a lado
   const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });

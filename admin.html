@@ -72,6 +72,7 @@
         <option value="">Foto: todas</option><option value="aprovada">Com foto (aprovada)</option><option value="pendente">Foto pendente</option><option value="rejeitada">Foto rejeitada</option><option value="sem">Sem foto</option>
       </select>
       <button id="btnExportarFotos" onclick="exportarFotosXLSX()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold rounded-lg text-xs px-3 py-2">Exportar situação das fotos (planilha)</button>
+      <button id="btnPVC" onclick="cartoesPVC()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-xs px-3 py-2">Cartões para impressão PVC (85,6×54 mm)</button>
     </div>
     <p id="aviso" class="text-xs text-sky-400 min-h-[1rem] mb-2"></p>
 
@@ -674,6 +675,27 @@
       $('modalCartao').classList.add('hidden');
       btn.disabled = false; btn.textContent = 'PDF em lote (ativos)';
       $('aviso').textContent = `${itens.length} carteirinhas geradas (inativos não incluídos).`;
+    }
+
+    // Gera os cartoes da lista filtrada na tela, no tamanho de cartao de credito, para grafica/impressora de PVC.
+    async function cartoesPVC() {
+      const itens = listaFiltradaAtual.slice();
+      if (!itens.length) { $('aviso').textContent = 'Nenhum atleta na lista para gerar.'; return; }
+      const so = $('fFoto').value;
+      const desc = so === 'aprovada' ? ' (só com foto)' : so === 'sem' ? ' (só sem foto)' : '';
+      if (!confirm(`Gerar ${itens.length} carteirinha(s)${desc} em tamanho de cartão (85,6×54 mm), frente e verso?
+
+São usados os atletas que estão na lista da tela (respeita os filtros). Acima de 40 atletas o PDF é dividido em vários arquivos.`)) return;
+      $('rankingAdmin').classList.add('hidden');
+      $('rankingAdminAviso').classList.add('hidden');
+      const btn = $('btnPVC'); btn.disabled = true;
+      $('modalCartao').classList.remove('hidden');
+      try {
+        await gerarPDFCartoesPVC(itens.map(paraCartao), 'Cartoes_PVC_FIKARJ', (i, n) => { btn.textContent = `Gerando ${i}/${n}...`; });
+        $('aviso').textContent = `${itens.length} carteirinha(s) geradas para impressão (página ímpar = frente, par = verso).`;
+      } catch (e) { $('aviso').textContent = 'Erro ao gerar o PDF: ' + (e && e.message || e); }
+      $('modalCartao').classList.add('hidden');
+      btn.disabled = false; btn.textContent = 'Cartões para impressão PVC (85,6×54 mm)';
     }
 
     // ---- importar planilha ----
