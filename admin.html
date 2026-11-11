@@ -62,6 +62,7 @@
         <h3 class="font-bold">Certificados em lote</h3>
         <label>Assunto <input id="assuntoLoteProtocolo" required maxlength="240" class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Interessados, um por linha <textarea id="interessadosLoteProtocolo" required rows="5" class="block w-full rounded bg-gray-800 p-2"></textarea></label>
+        <label><input id="modoTesteLoteProtocolo" type="checkbox" checked> Usar sequência de teste no lote</label>
         <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Criar rascunhos e reservar protocolos</button>
         <pre id="resultadoLoteProtocolo" class="whitespace-pre-wrap" role="status"></pre>
       </form>
@@ -448,17 +449,18 @@
         status.textContent = 'Informe o assunto e de 1 a 500 interessados.';
         return;
       }
-      if (!confirm('Reservar ' + nomes.length + ' protocolos oficiais?')) return;
+      const modoTeste = $('modoTesteLoteProtocolo').checked;
+      if (!confirm('Reservar ' + nomes.length + (modoTeste ? ' protocolos de teste?' : ' protocolos oficiais?'))) return;
       button.disabled = true;
       try {
         const {data: auth, error: authError} = await sb.auth.getSession();
         if (authError || !auth.session) throw Error();
-        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([assunto,nomes]))));
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([modoTeste,assunto,nomes]))));
         const chave = 'fikarj-lote:' + auth.session.user.id + ':' + Array.from(digest,b=>b.toString(16).padStart(2,'0')).join('');
         const ids = JSON.parse(sessionStorage.getItem(chave) || 'null') || nomes.map(()=>crypto.randomUUID());
         sessionStorage.setItem(chave,JSON.stringify(ids));
         const p_documentos = nomes.map((interessado,i)=>({id:ids[i],tipo:'Certificado',assunto,interessado}));
-        const {data,error} = await sb.rpc('reservar_protocolos_fikarj',{p_documentos});
+        const {data,error} = await sb.rpc(modoTeste ? 'reservar_protocolos_teste_fikarj' : 'reservar_protocolos_fikarj',{p_documentos});
         if (error || !Array.isArray(data)) throw Error();
         const porId = new Map(data.map(d=>[d.solicitacao,d.protocolo]));
         if (ids.some(id=>!porId.get(id))) throw Error();
