@@ -41,6 +41,23 @@
 
   <!-- PAINEL -->
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
+    <details class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
+      <summary class="cursor-pointer font-bold text-white">Secretaria · Protocolo de documentos</summary>
+      <form id="formProtocolo" class="mt-4 grid gap-3 text-gray-100">
+        <label>Tipo de documento
+          <select id="tipoProtocolo" class="block w-full rounded bg-gray-800 p-2" required>
+            <option value="">Selecione</option>
+            <option>Ofício</option><option>Proposta</option><option>Projeto</option>
+            <option>Declaração</option><option>Certificado</option><option>Diploma</option>
+            <option>Parecer de TCC</option><option>Outro</option>
+          </select>
+        </label>
+        <label>Assunto <input id="assuntoProtocolo" class="block w-full rounded bg-gray-800 p-2" required maxlength="240"></label>
+        <label>Interessado <input id="interessadoProtocolo" class="block w-full rounded bg-gray-800 p-2" required maxlength="240"></label>
+        <button id="criarProtocolo" class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold" type="submit">Criar rascunho e reservar protocolo</button>
+        <p id="resultadoProtocolo" role="status" aria-live="polite"></p>
+      </form>
+    </details>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
       <h1 class="text-white font-cinzel font-extrabold text-lg">Painel da Federação · FIKARJ</h1>
       <div class="flex gap-2 text-xs">
@@ -367,6 +384,40 @@
       const { error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('senha').value });
       if (error) { $('msgLogin').textContent = 'E-mail ou senha incorretos.'; return; }
       iniciar();
+    });
+
+    $('formProtocolo').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = $('criarProtocolo');
+      if (button.disabled) return;
+      const resultado = $('resultadoProtocolo');
+      const p_tipo = $('tipoProtocolo').value.trim();
+      const p_assunto = $('assuntoProtocolo').value.trim();
+      const p_interessado = $('interessadoProtocolo').value.trim();
+      if (!p_tipo || !p_assunto || !p_interessado) {
+        resultado.textContent = 'Preencha tipo, assunto e interessado.';
+        return;
+      }
+      button.disabled = true;
+      resultado.textContent = 'Reservando protocolo…';
+      try {
+        const {data: auth, error: authError} = await sb.auth.getSession();
+        if (authError || !auth.session) throw Error('Sessão indisponível');
+        const bytes = new TextEncoder().encode(JSON.stringify([p_tipo,p_assunto,p_interessado]));
+        const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+        const chave = 'fikarj-protocolo:' + auth.session.user.id + ':' + Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
+        const p_solicitacao = sessionStorage.getItem(chave) || crypto.randomUUID();
+        sessionStorage.setItem(chave,p_solicitacao);
+        const {data, error} = await sb.rpc('reservar_protocolo_fikarj',{p_solicitacao,p_tipo,p_assunto,p_interessado});
+        if (error || typeof data !== 'string') throw Error('Reserva indisponível');
+        resultado.textContent = data + ' reservado. Rascunho criado.';
+        sessionStorage.removeItem(chave);
+        event.target.reset();
+      } catch {
+        resultado.textContent = 'Não foi possível confirmar a reserva. Tente novamente com os mesmos dados nesta aba.';
+      } finally {
+        button.disabled = false;
+      }
     });
     async function sair() { await sb.auth.signOut(); location.reload(); }
 
