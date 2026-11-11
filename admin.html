@@ -54,8 +54,24 @@
         </label>
         <label>Assunto <input id="assuntoProtocolo" class="block w-full rounded bg-gray-800 p-2" required maxlength="240"></label>
         <label>Interessado <input id="interessadoProtocolo" class="block w-full rounded bg-gray-800 p-2" required maxlength="240"></label>
+        <label><input id="modoTesteProtocolo" type="checkbox"> Usar sequência de teste</label>
         <button id="criarProtocolo" class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold" type="submit">Criar rascunho e reservar protocolo</button>
         <p id="resultadoProtocolo" role="status" aria-live="polite"></p>
+      </form>
+      <form id="formLoteProtocolo" class="mt-5 grid gap-2 border-t border-gray-700 pt-4 text-gray-100">
+        <h3 class="font-bold">Certificados em lote</h3>
+        <label>Assunto <input id="assuntoLoteProtocolo" required maxlength="240" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>Interessados, um por linha <textarea id="interessadosLoteProtocolo" required rows="5" class="block w-full rounded bg-gray-800 p-2"></textarea></label>
+        <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Criar rascunhos e reservar protocolos</button>
+        <pre id="resultadoLoteProtocolo" class="whitespace-pre-wrap" role="status"></pre>
+      </form>
+      <form id="formCancelarProtocolo" class="mt-5 grid gap-2 border-t border-gray-700 pt-4 text-gray-100">
+        <h3 class="font-bold">Cancelar rascunho oficial</h3>
+        <label>Protocolo, no formato 0001/2026 <input id="numeroCancelarProtocolo" required pattern="[0-9]+/[0-9]{4}" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>Motivo <input id="motivoCancelarProtocolo" required maxlength="240" class="block w-full rounded bg-gray-800 p-2"></label>
+        <p>Para cancelar, entre novamente no Portal e conclua esta ação em até cinco minutos.</p>
+        <button class="justify-self-start rounded bg-red-800 px-4 py-2 font-semibold">Cancelar protocolo</button>
+        <p id="resultadoCancelarProtocolo" role="status"></p>
       </form>
     </details>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -405,10 +421,11 @@
         if (authError || !auth.session) throw Error('Sessão indisponível');
         const bytes = new TextEncoder().encode(JSON.stringify([p_tipo,p_assunto,p_interessado]));
         const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
-        const chave = 'fikarj-protocolo:' + auth.session.user.id + ':' + Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
+        const modoTeste = $('modoTesteProtocolo').checked;
+        const chave = 'fikarj-protocolo:' + String(modoTeste) + ':' + auth.session.user.id + ':' + Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
         const p_solicitacao = sessionStorage.getItem(chave) || crypto.randomUUID();
         sessionStorage.setItem(chave,p_solicitacao);
-        const {data, error} = await sb.rpc('reservar_protocolo_fikarj',{p_solicitacao,p_tipo,p_assunto,p_interessado});
+        const {data, error} = await sb.rpc(modoTeste ? 'reservar_protocolo_teste_fikarj' : 'reservar_protocolo_fikarj',{p_solicitacao,p_tipo,p_assunto,p_interessado});
         if (error || typeof data !== 'string') throw Error('Reserva indisponível');
         resultado.textContent = data + ' reservado. Rascunho criado.';
         sessionStorage.removeItem(chave);
@@ -419,6 +436,58 @@
         button.disabled = false;
       }
     });
+
+    $('formLoteProtocolo').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = event.submitter;
+      if (button.disabled) return;
+      const status = $('resultadoLoteProtocolo');
+      const assunto = $('assuntoLoteProtocolo').value.trim();
+      const nomes = $('interessadosLoteProtocolo').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      if (!assunto || !nomes.length || nomes.length > 500) {
+        status.textContent = 'Informe o assunto e de 1 a 500 interessados.';
+        return;
+      }
+      if (!confirm('Reservar ' + nomes.length + ' protocolos oficiais?')) return;
+      button.disabled = true;
+      try {
+        const {data: auth, error: authError} = await sb.auth.getSession();
+        if (authError || !auth.session) throw Error();
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([assunto,nomes]))));
+        const chave = 'fikarj-lote:' + auth.session.user.id + ':' + Array.from(digest,b=>b.toString(16).padStart(2,'0')).join('');
+        const ids = JSON.parse(sessionStorage.getItem(chave) || 'null') || nomes.map(()=>crypto.randomUUID());
+        sessionStorage.setItem(chave,JSON.stringify(ids));
+        const p_documentos = nomes.map((interessado,i)=>({id:ids[i],tipo:'Certificado',assunto,interessado}));
+        const {data,error} = await sb.rpc('reservar_protocolos_fikarj',{p_documentos});
+        if (error || !Array.isArray(data)) throw Error();
+        const porId = new Map(data.map(d=>[d.solicitacao,d.protocolo]));
+        if (ids.some(id=>!porId.get(id))) throw Error();
+        status.textContent = nomes.map((nome,i)=>porId.get(ids[i]) + ' · ' + nome).join('\n');
+        sessionStorage.removeItem(chave);
+        event.target.reset();
+      } catch {
+        status.textContent = 'Reserva não confirmada. Repita com os mesmos dados nesta aba.';
+      } finally { button.disabled = false; }
+    });
+
+    $('formCancelarProtocolo').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = event.submitter;
+      if (button.disabled) return;
+      const [numero,ano] = $('numeroCancelarProtocolo').value.trim().split('/');
+      const p_motivo = $('motivoCancelarProtocolo').value.trim();
+      const status = $('resultadoCancelarProtocolo');
+      if (!p_motivo || !confirm('Cancelar este rascunho e manter o número no histórico?')) return;
+      button.disabled = true;
+      try {
+        const {data,error} = await sb.rpc('cancelar_protocolo_fikarj',{p_ano:Number(ano),p_numero:Number(numero),p_motivo});
+        status.textContent = error ? 'Cancelamento recusado. Confira o protocolo e entre novamente no Portal.' :
+          data ? 'Rascunho cancelado. Número preservado no histórico.' : 'Rascunho não encontrado ou já encerrado.';
+        if (!error && data) event.target.reset();
+      } catch { status.textContent = 'Não foi possível confirmar o cancelamento.'; }
+      finally { button.disabled = false; }
+    });
+
     async function sair() { await sb.auth.signOut(); location.reload(); }
 
     async function iniciar() {
