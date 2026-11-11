@@ -65,6 +65,7 @@
         <label><input id="modoTesteLoteProtocolo" type="checkbox" checked> Usar sequência de teste no lote</label>
         <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Criar rascunhos e reservar protocolos</button>
         <pre id="resultadoLoteProtocolo" class="whitespace-pre-wrap" role="status"></pre>
+        <div id="previasLoteProtocolo" class="flex flex-wrap gap-2"></div>
       </form>
       <form id="formCancelarProtocolo" class="mt-5 grid gap-2 border-t border-gray-700 pt-4 text-gray-100">
         <h3 class="font-bold">Cancelar rascunho oficial</h3>
@@ -438,6 +439,34 @@
       }
     });
 
+function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
+  if (!/^TESTE FIKARJ [0-9]+\/[0-9]{4}$/.test(protocolo)) throw Error('Use um protocolo de teste.');
+  const pdf = new JsPDF({orientation:'landscape',format:'a4',unit:'mm'});
+  pdf.setDrawColor(24,45,68);
+  pdf.setLineWidth(0.6);
+  pdf.rect(14,14,269,182);
+  pdf.setTextColor(24,45,68);
+  pdf.setFont('helvetica','bold');
+  pdf.setFontSize(13);
+  pdf.text('FIKARJ',148.5,35,{align:'center'});
+  pdf.setFontSize(24);
+  pdf.text('Prévia de certificado',148.5,58,{align:'center'});
+  pdf.setFontSize(20);
+  const nomeLinhas = pdf.splitTextToSize(nome,240);
+  pdf.text(nomeLinhas,148.5,83,{align:'center'});
+  pdf.setFont('helvetica','normal');
+  pdf.setFontSize(13);
+  const assuntoLinhas = pdf.splitTextToSize(assunto,230);
+  const inicioAssunto = 100 + (nomeLinhas.length - 1) * 9;
+  if (inicioAssunto + assuntoLinhas.length * 7 > 153) throw Error('Nome ou assunto excede o espaço da prévia.');
+  pdf.text(assuntoLinhas,148.5,inicioAssunto,{align:'center'});
+  pdf.setFont('helvetica','bold');
+  pdf.text(protocolo,148.5,162,{align:'center'});
+  pdf.setTextColor(140,30,35);
+  pdf.text('DEMONSTRAÇÃO - SEM VALIDADE OFICIAL',148.5,181,{align:'center'});
+  return pdf;
+}
+
     $('formLoteProtocolo').addEventListener('submit', async event => {
       event.preventDefault();
       const button = event.submitter;
@@ -452,6 +481,7 @@
       const modoTeste = $('modoTesteLoteProtocolo').checked;
       if (!confirm('Reservar ' + nomes.length + (modoTeste ? ' protocolos de teste?' : ' protocolos oficiais?'))) return;
       button.disabled = true;
+      $('previasLoteProtocolo').replaceChildren();
       try {
         const {data: auth, error: authError} = await sb.auth.getSession();
         if (authError || !auth.session) throw Error();
@@ -465,6 +495,22 @@
         const porId = new Map(data.map(d=>[d.solicitacao,d.protocolo]));
         if (ids.some(id=>!porId.get(id))) throw Error();
         status.textContent = nomes.map((nome,i)=>porId.get(ids[i]) + ' · ' + nome).join('\n');
+        if (modoTeste) nomes.forEach((nome,i)=>{
+          const protocolo = porId.get(ids[i]);
+          const baixar = document.createElement('button');
+          baixar.type = 'button';
+          baixar.className = 'rounded border border-gray-700 px-3 py-1';
+          baixar.textContent = 'Baixar prévia PDF · ' + nome;
+          baixar.addEventListener('click',()=>{
+            try {
+              gerarPreviaCertificado(nome,assunto,protocolo,window.jspdf.jsPDF)
+                .save(protocolo.replace(/[^A-Za-z0-9]+/g,'-') + '.pdf');
+            } catch (erro) {
+              status.textContent += '\nFalha na prévia de ' + nome + '. ' + erro.message;
+            }
+          });
+          $('previasLoteProtocolo').append(baixar);
+        });
         sessionStorage.removeItem(chave);
         event.target.reset();
       } catch {
