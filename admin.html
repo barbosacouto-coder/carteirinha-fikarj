@@ -97,11 +97,12 @@
       </form>
       <form id="formEmissaoDiploma" class="mt-5 grid gap-3 border-t border-gray-700 pt-4 text-gray-100">
         <h3 class="font-bold">Registrar emissão de diploma</h3>
-        <label>Protocolo oficial do diploma <input id="numeroEmissaoDiploma" placeholder="0002/2026" required pattern="[0-9]{1,15}/[0-9]{4}" class="block w-full rounded bg-gray-800 p-2"></label>
-        <label>PDF final assinado <input id="pdfEmissaoDiploma" type="file" accept=".pdf,application/pdf" required class="block w-full rounded bg-gray-800 p-2"></label>
-        <label><input id="confereEmissaoDiploma" type="checkbox" required> Conferi que o PDF contém o protocolo, o nome do atleta e as assinaturas autorizadas.</label>
+        <label><input id="modoTesteEmissaoDiploma" type="checkbox" checked> Usar sequência de teste</label>
+        <label>Protocolo do diploma <input id="numeroEmissaoDiploma" placeholder="0002/2026" required pattern="[0-9]{1,15}/[0-9]{4}" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label><span id="rotuloPdfEmissao">PDF da prévia de teste</span> <input id="pdfEmissaoDiploma" type="file" accept=".pdf,application/pdf" required class="block w-full rounded bg-gray-800 p-2"></label>
+        <label><input id="confereEmissaoDiploma" type="checkbox" required> <span id="rotuloConfereEmissao">Conferi o protocolo de teste e o nome do atleta no PDF.</span></label>
         <p class="text-sm text-gray-300">Guarde o PDF no acervo da Secretaria. O Portal registra a impressão digital do arquivo, a data e o operador.</p>
-        <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Registrar emissão oficial</button>
+        <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold" id="botaoRegistrarEmissao">Registrar emissão de teste</button>
         <p id="statusEmissaoDiploma" role="status"></p>
       </form>
     </details>
@@ -710,6 +711,16 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
     });
 
 
+    function atualizarModoEmissaoDiploma() {
+      const teste = $('modoTesteEmissaoDiploma').checked;
+      $('rotuloPdfEmissao').textContent = teste ? 'PDF da prévia de teste' : 'PDF final assinado';
+      $('rotuloConfereEmissao').textContent = teste ? 'Conferi o protocolo de teste e o nome do atleta no PDF.' : 'Conferi o protocolo oficial, o nome do atleta e as assinaturas autorizadas no PDF.';
+      $('botaoRegistrarEmissao').textContent = teste ? 'Registrar emissão de teste' : 'Registrar emissão oficial';
+      $('confereEmissaoDiploma').checked = false;
+      $('pdfEmissaoDiploma').value = '';
+      $('numeroEmissaoDiploma').value = '';
+    }
+    $('modoTesteEmissaoDiploma').addEventListener('change',atualizarModoEmissaoDiploma);
     $('formEmissaoDiploma').addEventListener('submit', async event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -720,10 +731,11 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       const match = /^([0-9]{1,15})\/([0-9]{4})$/.exec(numeroCompleto);
       const arquivo = $('pdfEmissaoDiploma').files[0];
       if (!match || Number(match[1]) < 1 || !arquivo || arquivo.size > 20 * 1024 * 1024 || !$('confereEmissaoDiploma').checked) {
-        status.textContent = 'Informe o protocolo oficial e confirme a conferência do PDF de até 20 MB.';
+        status.textContent = 'Informe o protocolo e confirme a conferência do PDF de até 20 MB.';
         return;
       }
-      if (!confirm('Registrar a emissão oficial do diploma ' + numeroCompleto + '?')) return;
+      const modoTeste = $('modoTesteEmissaoDiploma').checked;
+      if (!confirm('Registrar a emissão ' + (modoTeste ? 'de teste' : 'oficial') + ' do diploma ' + numeroCompleto + '?')) return;
       botao.disabled = true;
       status.textContent = 'Registrando emissão…';
       try {
@@ -731,10 +743,11 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
         if (new TextDecoder().decode(bytes.slice(0,5)) !== '%PDF-') throw Error('Selecione um arquivo PDF válido.');
         const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
         const p_pdf_sha256 = Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
-        const {data,error} = await sb.rpc('registrar_emissao_diploma_fikarj',{p_ano:Number(match[2]),p_numero:Number(match[1]),p_pdf_sha256});
+        const {data,error} = await sb.rpc(modoTeste ? 'registrar_emissao_diploma_teste_fikarj' : 'registrar_emissao_diploma_fikarj',{p_ano:Number(match[2]),p_numero:Number(match[1]),p_pdf_sha256});
         if (error || !data) throw Error(error?.message || 'O Portal não confirmou o registro.');
-        status.textContent = 'Emissão registrada para ' + numeroCompleto + '.';
+        status.textContent = (modoTeste ? 'Emissão de teste registrada para ' : 'Emissão oficial registrada para ') + numeroCompleto + '.';
         form.reset();
+        atualizarModoEmissaoDiploma();
       } catch (erro) { status.textContent = 'Emissão não confirmada. ' + erro.message; }
       finally { botao.disabled = false; }
     });
