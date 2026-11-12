@@ -88,7 +88,8 @@
         <label>Data do exame <input id="dataExameDiploma" type="date" required class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Local do exame <input id="localExameDiploma" required maxlength="120" class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Professor responsável <select id="professorExameDiploma" required disabled class="block w-full rounded bg-gray-800 p-2"><option value="">Informe as matrículas primeiro</option></select></label>
-        <label>Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" required class="block w-full rounded bg-gray-800 p-2"></label>
+        <p id="statusLogoExame" class="text-sm text-gray-300" role="status">Informe a matrícula para localizar a logomarca.</p>
+        <label id="campoLogoExame">Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" class="block w-full rounded bg-gray-800 p-2"></label>
         <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Conferir atletas e gerar prévias</button>
         <p id="statusExame" role="status"></p>
         <div id="previasExame" class="flex flex-wrap gap-2"></div>
@@ -282,6 +283,7 @@
 
   <script src="config.js"></script>
   <script src="cartao.js"></script>
+  <script src="logos-associacoes.js"></script>
   <script>
 (function (root) {
   "use strict";
@@ -563,6 +565,8 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       const versao = ++revisaoResponsaveisExame;
       const seletor = $('professorExameDiploma');
       const anterior = seletor.value;
+      $('statusLogoExame').textContent = 'Informe a matrícula para localizar a logomarca.';
+      $('campoLogoExame').hidden = false;
       seletor.replaceChildren(new Option('Selecione o professor responsável',''));
       seletor.disabled = true;
       const entradas = $('matriculasExame').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
@@ -573,6 +577,9 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       });
       const sigla = associacoes[0];
       if (!sigla || associacoes.some(a=>a!==sigla)) return;
+      const temLogo = Boolean(window.FIKARJ_LOGOS_ASSOCIACOES?.[sigla]);
+      $('campoLogoExame').hidden = temLogo;
+      $('statusLogoExame').textContent = temLogo ? 'Logomarca oficial localizada para ' + sigla + '.' : 'Selecione a logomarca oficial de ' + sigla + '.';
       try {
         const lista = await listarResponsaveisExame();
         if (versao!==revisaoResponsaveisExame) return;
@@ -616,8 +623,10 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
         const responsaveis = await listarResponsaveisExame();
         if (!responsaveis.some(r=>r.sigla===sigla && r.nome===professor)) throw Error('Selecione um responsável cadastrado para esta associação.');
         const arquivo = $('logoExame').files[0];
-        if (!arquivo || !['image/png','image/jpeg'].includes(arquivo.type) || arquivo.size > 5 * 1024 * 1024) throw Error('Selecione uma logomarca PNG ou JPEG de até 5 MB.');
-        const imagem = await createImageBitmap(arquivo);
+        const logoCadastrada = window.FIKARJ_LOGOS_ASSOCIACOES?.[sigla];
+        if (!logoCadastrada && (!arquivo || !['image/png','image/jpeg'].includes(arquivo.type) || arquivo.size > 5 * 1024 * 1024)) throw Error('Selecione uma logomarca PNG ou JPEG de até 5 MB.');
+        const fonteLogo = logoCadastrada ? await (await fetch(logoCadastrada)).blob() : arquivo;
+        const imagem = await createImageBitmap(fonteLogo);
         let logo, largura, altura;
         try {
           const escala = Math.min(1,420/Math.max(imagem.width,imagem.height));
@@ -630,7 +639,7 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
           largura = superficie.width*proporcao;
           altura = superficie.height*proporcao;
         } finally { imagem.close(); }
-        status.textContent = grupo.length + ' atletas localizados · ' + entidade.nome + '. Confira se a logomarca selecionada pertence à associação.';
+        status.textContent = grupo.length + ' atletas localizados · ' + entidade.nome + (logoCadastrada ? '. Logomarca oficial carregada.' : '. Confira se a logomarca selecionada pertence à associação.');
         for (const atleta of grupo) {
           const baixar = document.createElement('button');
           baixar.type = 'button';
