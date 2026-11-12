@@ -695,10 +695,20 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
                 pdf.setFontSize(10);
                 pdf.text(protocolo,148.5,160,{align:'center'});
               }
+              pdf.setDrawColor(23,43,72);
+              pdf.setLineWidth(0.25);
+              pdf.line(34,163,120,163);
+              pdf.line(177,163,263,163);
+              pdf.setFontSize(9);
+              if (protocolo) {
+                pdf.setTextColor(140,30,35);
+                pdf.text('ASSINATURA FICTÍCIA',77,159,{align:'center'});
+                pdf.setTextColor(23,43,72);
+              }
               pdf.setFontSize(10);
-              pdf.text('Presidência da FIKARJ',77,167,{align:'center'});
-              pdf.text(pdf.splitTextToSize(professor,88),220,167,{align:'center'});
-              pdf.text('Professor responsável',220,177,{align:'center'});
+              pdf.text('Presidência da FIKARJ',77,169,{align:'center'});
+              pdf.text(pdf.splitTextToSize(professor,84),220,169,{align:'center'});
+              pdf.text('Professor responsável',220,180,{align:'center'});
               pdf.setTextColor(140,30,35);
               pdf.text('DEMONSTRAÇÃO - SEM VALIDADE OFICIAL',148.5,188,{align:'center'});
               pdf.save('previa-exame-' + Number(atleta.registro) + '.pdf');
