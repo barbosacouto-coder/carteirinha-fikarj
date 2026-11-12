@@ -84,7 +84,10 @@
       </form>
       <form id="formPreviaExame" class="mt-5 grid gap-2 border-t border-gray-700 pt-4 text-gray-100">
         <h3 class="font-bold">Prévia de exame de faixa</h3>
-        <label>Matrículas FIKARJ, uma por linha <textarea id="matriculasExame" required rows="3" class="block w-full rounded bg-gray-800 p-2"></textarea></label>
+        <label>Matrícula e graduação aprovada, uma por linha (exemplo: 00001 | PRETA 1º DAN) <textarea id="matriculasExame" required rows="3" class="block w-full rounded bg-gray-800 p-2"></textarea></label>
+        <label>Data do exame <input id="dataExameDiploma" type="date" required class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>Local do exame <input id="localExameDiploma" required maxlength="120" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>Professor responsável <input id="professorExameDiploma" required maxlength="100" class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" required class="block w-full rounded bg-gray-800 p-2"></label>
         <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Conferir atletas e gerar prévias</button>
         <p id="statusExame" role="status"></p>
@@ -555,8 +558,15 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       botao.disabled = true;
       try {
         const entradas = $('matriculasExame').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-        if (!entradas.length || entradas.length > 500 || entradas.some(s => !/^\d{1,9}$/.test(s))) throw Error('Informe matrículas válidas, uma por linha.');
-        const numeros = entradas.map(Number);
+        if (!entradas.length || entradas.length > 500 || entradas.some(s => !/^\d{1,9}\s*\|\s*[^|]{2,60}$/.test(s))) throw Error('Informe matrícula e graduação aprovada, separadas por |, uma por linha.');
+        const linhas = entradas.map(s=>s.split('|').map(v=>v.trim()));
+        const numeros = linhas.map(([n])=>Number(n));
+        const aprovadas = new Map(linhas.map(([n,g])=>[Number(n),g]));
+        const dataExame = $('dataExameDiploma').value;
+        const localExame = $('localExameDiploma').value.trim();
+        const professor = $('professorExameDiploma').value.trim();
+        if (!dataExame || !localExame || !professor) throw Error('Informe data, local e professor responsável.');
+        const dataBR = dataExame.split('-').reverse().join('/');
         if (new Set(numeros).size !== numeros.length) throw Error('Retire as matrículas repetidas.');
         const porMatricula = new Map(atletas.filter(a => a.registro != null).map(a => [Number(a.registro),a]));
         const grupo = numeros.map(n => porMatricula.get(n));
@@ -585,7 +595,7 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
           const baixar = document.createElement('button');
           baixar.type = 'button';
           baixar.className = 'rounded border border-gray-700 px-3 py-1';
-          baixar.textContent = atleta.nome + ' · ' + (atleta.graduacao || 'Graduação não informada');
+          baixar.textContent = atleta.nome + ' · ' + aprovadas.get(Number(atleta.registro));
           baixar.addEventListener('click', () => {
             try {
               const pdf = new window.jspdf.jsPDF({orientation:'landscape',format:'a4',unit:'mm'});
@@ -600,10 +610,16 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
               pdf.setFontSize(20);
               pdf.text(pdf.splitTextToSize(atleta.nome,232),148.5,92,{align:'center'});
               pdf.setFontSize(13);
-              pdf.text('Graduação cadastrada: ' + (atleta.graduacao || 'a conferir'),148.5,119,{align:'center'});
+              pdf.text('Graduação aprovada informada: ' + aprovadas.get(Number(atleta.registro)),148.5,115,{align:'center'});
+              pdf.setFontSize(11);
+              pdf.text(pdf.splitTextToSize('Exame: ' + dataBR + ' · ' + localExame,220),148.5,125,{align:'center'});
               pdf.addImage(logo,'PNG',148.5-largura/2,137,largura,altura);
+              pdf.setFontSize(10);
+              pdf.text('Presidência da FIKARJ',77,167,{align:'center'});
+              pdf.text(pdf.splitTextToSize(professor,88),220,167,{align:'center'});
+              pdf.text('Professor responsável',220,177,{align:'center'});
               pdf.setTextColor(140,30,35);
-              pdf.text('DEMONSTRAÇÃO - SEM VALIDADE OFICIAL',148.5,179,{align:'center'});
+              pdf.text('DEMONSTRAÇÃO - SEM VALIDADE OFICIAL',148.5,188,{align:'center'});
               pdf.save('previa-exame-' + Number(atleta.registro) + '.pdf');
             } catch { status.textContent = 'Não foi possível baixar a prévia. Confira a logomarca e tente novamente.'; }
           });
