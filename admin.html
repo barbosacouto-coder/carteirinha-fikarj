@@ -636,7 +636,7 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
           superficie.height = Math.max(1,Math.round(imagem.height*escala));
           superficie.getContext('2d').drawImage(imagem,0,0,superficie.width,superficie.height);
           logo = superficie.toDataURL('image/png');
-          const proporcao = Math.min(24/superficie.width,20/superficie.height);
+          const proporcao = Math.min(24/superficie.width,16/superficie.height);
           largura = superficie.width*proporcao;
           altura = superficie.height*proporcao;
         } finally { imagem.close(); }
@@ -679,11 +679,11 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
               pdf.text('Graduação aprovada informada: ' + aprovadas.get(Number(atleta.registro)),148.5,115,{align:'center'});
               pdf.setFontSize(11);
               pdf.text(pdf.splitTextToSize('Exame: ' + dataBR + ' · ' + localExame,220),148.5,125,{align:'center'});
-              pdf.addImage(logo,'PNG',148.5-largura/2,137,largura,altura);
+              pdf.addImage(logo,'PNG',148.5-largura/2,136,largura,altura);
               const protocolo = protocolos.get(Number(atleta.registro));
               if (protocolo) {
                 pdf.setFontSize(10);
-                pdf.text(protocolo,148.5,158,{align:'center'});
+                pdf.text(protocolo,148.5,160,{align:'center'});
               }
               pdf.setFontSize(10);
               pdf.text('Presidência da FIKARJ',77,167,{align:'center'});
