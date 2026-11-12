@@ -90,6 +90,8 @@
         <label>Professor responsável <select id="professorExameDiploma" required disabled class="block w-full rounded bg-gray-800 p-2"><option value="">Informe as matrículas primeiro</option></select></label>
         <p id="statusLogoExame" class="text-sm text-gray-300" role="status">Informe a matrícula para localizar a logomarca.</p>
         <label id="campoLogoExame">Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>Protocolo oficial para preparar um diploma <input id="protocoloOficialExame" placeholder="0002/2026" pattern="[0-9]{1,15}/[0-9]{4}" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label><input id="confirmaDiplomaOficialExame" type="checkbox"> Conferi o resultado homologado e autorizo aplicar a assinatura da Presidência ao diploma deste atleta.</label>
         <label><input id="protocolosTesteExame" type="checkbox"> Reservar protocolos de teste para as prévias</label>
         <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Conferir atletas e gerar prévias</button>
         <p id="statusExame" role="status"></p>
@@ -667,6 +669,29 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
           grupo.forEach((atleta,k)=>protocolos.set(Number(atleta.registro),porId.get(ids[k])));
           status.textContent += ' · ' + protocolos.size + ' protocolos de teste vinculados.';
         }
+        const oficial = $('protocoloOficialExame').value.trim();
+        let assinaturaOficial = null;
+        let dimensoesAssinatura = null;
+        if (oficial) {
+          const match = /^([0-9]{1,15})\/([0-9]{4})$/.exec(oficial);
+          if (!match || grupo.length !== 1 || $('protocolosTesteExame').checked || !$('confirmaDiplomaOficialExame').checked) {
+            throw Error('Para preparar um diploma oficial, informe um atleta, o protocolo dele e confirme o resultado. Desmarque a sequência de teste.');
+          }
+          const hoje = new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date());
+          if (dataExame > hoje) throw Error('A data do exame ainda é futura.');
+          if (!confirm('Aplicar a assinatura da Presidência ao diploma ' + oficial + '?')) return;
+          const {data,error} = await sb.rpc('assinatura_presidencia_diploma_fikarj',{
+            p_ano:Number(match[2]),p_numero:Number(match[1]),p_atleta:Number(grupo[0].registro)
+          });
+          if (error || !data?.startsWith('data:image/png;base64,')) throw Error(error?.message || 'Assinatura indisponível.');
+          assinaturaOficial = data;
+          const medidas = await createImageBitmap(await (await fetch(data)).blob());
+          try {
+            const escala = Math.min(72/medidas.width,14/medidas.height);
+            dimensoesAssinatura = [medidas.width*escala,medidas.height*escala];
+          } finally { medidas.close(); }
+          status.textContent = 'Diploma preparado. Baixe o PDF para a assinatura do professor. O registro de emissão é feito em etapa própria.';
+        }
         for (const atleta of grupo) {
           const baixar = document.createElement('button');
           baixar.type = 'button';
@@ -682,15 +707,15 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
               pdf.setFontSize(15);
               pdf.text(pdf.splitTextToSize(entidade.nome,235),148.5,35,{align:'center'});
               pdf.setFontSize(22);
-              pdf.text('Prévia de exame de faixa',148.5,64,{align:'center'});
+              pdf.text(oficial ? 'Diploma de graduação' : 'Prévia de exame de faixa',148.5,64,{align:'center'});
               pdf.setFontSize(20);
               pdf.text(pdf.splitTextToSize(atleta.nome,232),148.5,92,{align:'center'});
               pdf.setFontSize(13);
-              pdf.text('Graduação aprovada informada: ' + aprovadas.get(Number(atleta.registro)),148.5,115,{align:'center'});
+              pdf.text((oficial ? 'Graduação aprovada: ' : 'Graduação aprovada informada: ') + aprovadas.get(Number(atleta.registro)),148.5,115,{align:'center'});
               pdf.setFontSize(11);
               pdf.text(pdf.splitTextToSize('Exame: ' + dataBR + ' · ' + localExame,220),148.5,125,{align:'center'});
               pdf.addImage(logo,'PNG',148.5-largura/2,136,largura,altura);
-              const protocolo = protocolos.get(Number(atleta.registro));
+              const protocolo = oficial ? 'Protocolo FIKARJ ' + oficial : protocolos.get(Number(atleta.registro));
               if (protocolo) {
                 pdf.setFontSize(10);
                 pdf.text(protocolo,148.5,160,{align:'center'});
@@ -700,7 +725,10 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
               pdf.line(34,163,120,163);
               pdf.line(177,163,263,163);
               pdf.setFontSize(9);
-              if (protocolo) {
+              if (assinaturaOficial) {
+                const [w,h] = dimensoesAssinatura;
+                pdf.addImage(assinaturaOficial,'PNG',77-w/2,162-h,w,h);
+              } else if (protocolo) {
                 pdf.setTextColor(140,30,35);
                 pdf.text('ASSINATURA FICTÍCIA',77,159,{align:'center'});
                 pdf.setTextColor(23,43,72);
@@ -710,8 +738,8 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
               pdf.text(pdf.splitTextToSize(professor,84),220,169,{align:'center'});
               pdf.text('Professor responsável',220,180,{align:'center'});
               pdf.setTextColor(140,30,35);
-              pdf.text('DEMONSTRAÇÃO - SEM VALIDADE OFICIAL',148.5,188,{align:'center'});
-              pdf.save('previa-exame-' + Number(atleta.registro) + '.pdf');
+              if (!oficial) pdf.text('DEMONSTRAÇÃO - SEM VALIDADE OFICIAL',148.5,188,{align:'center'});
+              pdf.save(oficial ? 'diploma-fikarj-' + oficial.replace('/','-') + '.pdf' : 'previa-exame-' + Number(atleta.registro) + '.pdf');
             } catch { status.textContent = 'Não foi possível baixar a prévia. Confira a logomarca e tente novamente.'; }
           });
           painel.append(baixar);
