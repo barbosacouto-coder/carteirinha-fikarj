@@ -82,6 +82,14 @@
         <button class="justify-self-start rounded bg-red-800 px-4 py-2 font-semibold">Cancelar protocolo</button>
         <p id="resultadoCancelarProtocolo" role="status"></p>
       </form>
+      <form id="formPreviaExame" class="mt-5 grid gap-2 border-t border-gray-700 pt-4 text-gray-100">
+        <h3 class="font-bold">Prévia de exame de faixa</h3>
+        <label>Matrículas FIKARJ, uma por linha <textarea id="matriculasExame" required rows="3" class="block w-full rounded bg-gray-800 p-2"></textarea></label>
+        <label>Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" required class="block w-full rounded bg-gray-800 p-2"></label>
+        <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Conferir atletas e gerar prévias</button>
+        <p id="statusExame" role="status"></p>
+        <div id="previasExame" class="flex flex-wrap gap-2"></div>
+      </form>
     </details>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
       <h1 class="text-white font-cinzel font-extrabold text-lg">Cadastro de filiados</h1>
@@ -535,6 +543,74 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
         if (!error && data) event.target.reset();
       } catch { status.textContent = 'Não foi possível confirmar o cancelamento.'; }
       finally { button.disabled = false; }
+    });
+
+
+    $('formPreviaExame').addEventListener('submit', async event => {
+      event.preventDefault();
+      const status = $('statusExame');
+      const painel = $('previasExame');
+      const botao = event.submitter;
+      painel.replaceChildren();
+      botao.disabled = true;
+      try {
+        const entradas = $('matriculasExame').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        if (!entradas.length || entradas.length > 500 || entradas.some(s => !/^\d{1,9}$/.test(s))) throw Error('Informe matrículas válidas, uma por linha.');
+        const numeros = entradas.map(Number);
+        if (new Set(numeros).size !== numeros.length) throw Error('Retire as matrículas repetidas.');
+        const porMatricula = new Map(atletas.filter(a => a.registro != null).map(a => [Number(a.registro),a]));
+        const grupo = numeros.map(n => porMatricula.get(n));
+        const ausentes = entradas.filter((_,i) => !grupo[i]);
+        if (ausentes.length) throw Error('Matrículas sem correspondência: ' + ausentes.join(', '));
+        const sigla = grupo[0].associacao;
+        const entidade = assocs.find(a => a.sigla === sigla);
+        if (!entidade?.nome || grupo.some(a => a.associacao !== sigla)) throw Error('Use matrículas de uma única associação cadastrada por vez.');
+        const arquivo = $('logoExame').files[0];
+        if (!arquivo || !['image/png','image/jpeg'].includes(arquivo.type) || arquivo.size > 5 * 1024 * 1024) throw Error('Selecione uma logomarca PNG ou JPEG de até 5 MB.');
+        const imagem = await createImageBitmap(arquivo);
+        let logo, largura, altura;
+        try {
+          const escala = Math.min(1,420/Math.max(imagem.width,imagem.height));
+          const superficie = document.createElement('canvas');
+          superficie.width = Math.max(1,Math.round(imagem.width*escala));
+          superficie.height = Math.max(1,Math.round(imagem.height*escala));
+          superficie.getContext('2d').drawImage(imagem,0,0,superficie.width,superficie.height);
+          logo = superficie.toDataURL('image/png');
+          const proporcao = Math.min(24/superficie.width,20/superficie.height);
+          largura = superficie.width*proporcao;
+          altura = superficie.height*proporcao;
+        } finally { imagem.close(); }
+        status.textContent = grupo.length + ' atletas localizados · ' + entidade.nome + '. Confira se a logomarca selecionada pertence à associação.';
+        for (const atleta of grupo) {
+          const baixar = document.createElement('button');
+          baixar.type = 'button';
+          baixar.className = 'rounded border border-gray-700 px-3 py-1';
+          baixar.textContent = atleta.nome + ' · ' + (atleta.graduacao || 'Graduação não informada');
+          baixar.addEventListener('click', () => {
+            try {
+              const pdf = new window.jspdf.jsPDF({orientation:'landscape',format:'a4',unit:'mm'});
+              pdf.setDrawColor(23,43,72);
+              pdf.rect(14,14,269,182);
+              pdf.setTextColor(23,43,72);
+              pdf.setFont('helvetica','bold');
+              pdf.setFontSize(15);
+              pdf.text(pdf.splitTextToSize(entidade.nome,235),148.5,35,{align:'center'});
+              pdf.setFontSize(22);
+              pdf.text('Prévia de exame de faixa',148.5,64,{align:'center'});
+              pdf.setFontSize(20);
+              pdf.text(pdf.splitTextToSize(atleta.nome,232),148.5,92,{align:'center'});
+              pdf.setFontSize(13);
+              pdf.text('Graduação cadastrada: ' + (atleta.graduacao || 'a conferir'),148.5,119,{align:'center'});
+              pdf.addImage(logo,'PNG',148.5-largura/2,137,largura,altura);
+              pdf.setTextColor(140,30,35);
+              pdf.text('DEMONSTRAÇÃO - SEM VALIDADE OFICIAL',148.5,179,{align:'center'});
+              pdf.save('previa-exame-' + Number(atleta.registro) + '.pdf');
+            } catch { status.textContent = 'Não foi possível baixar a prévia. Confira a logomarca e tente novamente.'; }
+          });
+          painel.append(baixar);
+        }
+      } catch (erro) { status.textContent = erro.message; }
+      finally { botao.disabled = false; }
     });
 
     async function sair() { await sb.auth.signOut(); location.reload(); }
