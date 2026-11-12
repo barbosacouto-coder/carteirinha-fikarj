@@ -87,7 +87,7 @@
         <label>Matrícula e graduação aprovada, uma por linha (exemplo: 00001 | PRETA 1º DAN) <textarea id="matriculasExame" required rows="3" class="block w-full rounded bg-gray-800 p-2"></textarea></label>
         <label>Data do exame <input id="dataExameDiploma" type="date" required class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Local do exame <input id="localExameDiploma" required maxlength="120" class="block w-full rounded bg-gray-800 p-2"></label>
-        <label>Professor responsável <input id="professorExameDiploma" required maxlength="100" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>Professor responsável <select id="professorExameDiploma" required disabled class="block w-full rounded bg-gray-800 p-2"><option value="">Informe as matrículas primeiro</option></select></label>
         <label>Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" required class="block w-full rounded bg-gray-800 p-2"></label>
         <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Conferir atletas e gerar prévias</button>
         <p id="statusExame" role="status"></p>
@@ -549,6 +549,44 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
     });
 
 
+
+    let consultaResponsaveisExame;
+    async function listarResponsaveisExame() {
+      consultaResponsaveisExame ??= sb.rpc('responsaveis_exame_fikarj').then(({data,error})=>{
+        if (error) { consultaResponsaveisExame = null; throw error; }
+        return data;
+      });
+      return consultaResponsaveisExame;
+    }
+    let revisaoResponsaveisExame = 0;
+    $('matriculasExame').addEventListener('input', async () => {
+      const versao = ++revisaoResponsaveisExame;
+      const seletor = $('professorExameDiploma');
+      const anterior = seletor.value;
+      seletor.replaceChildren(new Option('Selecione o professor responsável',''));
+      seletor.disabled = true;
+      const entradas = $('matriculasExame').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      if (!entradas.length || entradas.some(s=>!/^\d{1,9}\s*\|/.test(s))) return;
+      const associacoes = entradas.map(s=>{
+        const numero = Number(s.split('|')[0].trim());
+        return atletas.find(a=>a.registro != null && Number(a.registro)===numero)?.associacao;
+      });
+      const sigla = associacoes[0];
+      if (!sigla || associacoes.some(a=>a!==sigla)) return;
+      try {
+        const lista = await listarResponsaveisExame();
+        if (versao!==revisaoResponsaveisExame) return;
+        const responsaveis = lista.filter(r=>r.sigla===sigla);
+        seletor.replaceChildren(new Option(responsaveis.length ? 'Selecione o professor responsável' : 'Sem responsável cadastrado',''));
+        for (const r of responsaveis) seletor.add(new Option(r.nome,r.nome));
+        seletor.disabled = !responsaveis.length;
+        if (responsaveis.some(r=>r.nome===anterior)) seletor.value=anterior;
+        else if (responsaveis.length===1) seletor.value=responsaveis[0].nome;
+      } catch {
+        if (versao===revisaoResponsaveisExame) seletor.replaceChildren(new Option('Falha na consulta. Edite a matrícula para tentar novamente.',''));
+      }
+    });
+
     $('formPreviaExame').addEventListener('submit', async event => {
       event.preventDefault();
       const status = $('statusExame');
@@ -575,6 +613,8 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
         const sigla = grupo[0].associacao;
         const entidade = assocs.find(a => a.sigla === sigla);
         if (!entidade?.nome || grupo.some(a => a.associacao !== sigla)) throw Error('Use matrículas de uma única associação cadastrada por vez.');
+        const responsaveis = await listarResponsaveisExame();
+        if (!responsaveis.some(r=>r.sigla===sigla && r.nome===professor)) throw Error('Selecione um responsável cadastrado para esta associação.');
         const arquivo = $('logoExame').files[0];
         if (!arquivo || !['image/png','image/jpeg'].includes(arquivo.type) || arquivo.size > 5 * 1024 * 1024) throw Error('Selecione uma logomarca PNG ou JPEG de até 5 MB.');
         const imagem = await createImageBitmap(arquivo);
