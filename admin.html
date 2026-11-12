@@ -90,6 +90,7 @@
         <label>Professor responsável <select id="professorExameDiploma" required disabled class="block w-full rounded bg-gray-800 p-2"><option value="">Informe as matrículas primeiro</option></select></label>
         <p id="statusLogoExame" class="text-sm text-gray-300" role="status">Informe a matrícula para localizar a logomarca.</p>
         <label id="campoLogoExame">Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label><input id="protocolosTesteExame" type="checkbox"> Reservar protocolos de teste para as prévias</label>
         <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Conferir atletas e gerar prévias</button>
         <p id="statusExame" role="status"></p>
         <div id="previasExame" class="flex flex-wrap gap-2"></div>
@@ -640,6 +641,22 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
           altura = superficie.height*proporcao;
         } finally { imagem.close(); }
         status.textContent = grupo.length + ' atletas localizados · ' + entidade.nome + (logoCadastrada ? '. Logomarca oficial carregada.' : '. Confira se a logomarca selecionada pertence à associação.');
+        const protocolos = new Map();
+        if ($('protocolosTesteExame').checked) {
+          const {data: auth, error: authError} = await sb.auth.getSession();
+          if (authError || !auth.session) throw Error('Entre novamente no Portal.');
+          const digest = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([sigla,linhas,dataExame,localExame,professor])));
+          const chave = 'fikarj-exame-teste:' + auth.session.user.id + ':' + Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+          const ids = JSON.parse(sessionStorage.getItem(chave) || 'null') || grupo.map(()=>crypto.randomUUID());
+          sessionStorage.setItem(chave,JSON.stringify(ids));
+          const p_documentos = grupo.map((atleta,k)=>({id:ids[k],tipo:'Diploma',assunto:'Teste de exame de faixa · '+sigla+' · '+dataBR,interessado:atleta.nome}));
+          const {data,error} = await sb.rpc('reservar_protocolos_teste_fikarj',{p_documentos});
+          if (error || !Array.isArray(data)) throw Error('Reserva de teste não confirmada. Repita com os mesmos dados nesta aba.');
+          const porId = new Map(data.map(r=>[r.solicitacao,r.protocolo]));
+          if (ids.some(id=>!porId.get(id)?.startsWith('TESTE FIKARJ '))) throw Error('Protocolos de teste divergentes.');
+          grupo.forEach((atleta,k)=>protocolos.set(Number(atleta.registro),porId.get(ids[k])));
+          status.textContent += ' · ' + protocolos.size + ' protocolos de teste vinculados.';
+        }
         for (const atleta of grupo) {
           const baixar = document.createElement('button');
           baixar.type = 'button';
@@ -663,6 +680,11 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
               pdf.setFontSize(11);
               pdf.text(pdf.splitTextToSize('Exame: ' + dataBR + ' · ' + localExame,220),148.5,125,{align:'center'});
               pdf.addImage(logo,'PNG',148.5-largura/2,137,largura,altura);
+              const protocolo = protocolos.get(Number(atleta.registro));
+              if (protocolo) {
+                pdf.setFontSize(10);
+                pdf.text(protocolo,148.5,158,{align:'center'});
+              }
               pdf.setFontSize(10);
               pdf.text('Presidência da FIKARJ',77,167,{align:'center'});
               pdf.text(pdf.splitTextToSize(professor,88),220,167,{align:'center'});
