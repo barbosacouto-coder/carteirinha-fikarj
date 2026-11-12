@@ -95,6 +95,15 @@
         <p id="statusExame" role="status"></p>
         <div id="previasExame" class="flex flex-wrap gap-2"></div>
       </form>
+      <form id="formEmissaoDiploma" class="mt-5 grid gap-3 border-t border-gray-700 pt-4 text-gray-100">
+        <h3 class="font-bold">Registrar emissão de diploma</h3>
+        <label>Protocolo oficial do diploma <input id="numeroEmissaoDiploma" placeholder="0002/2026" required pattern="[0-9]{1,15}/[0-9]{4}" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>PDF final assinado <input id="pdfEmissaoDiploma" type="file" accept=".pdf,application/pdf" required class="block w-full rounded bg-gray-800 p-2"></label>
+        <label><input id="confereEmissaoDiploma" type="checkbox" required> Conferi que o PDF contém o protocolo, o nome do atleta e as assinaturas autorizadas.</label>
+        <p class="text-sm text-gray-300">Guarde o PDF no acervo da Secretaria. O Portal registra a impressão digital do arquivo, a data e o operador.</p>
+        <button class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold">Registrar emissão oficial</button>
+        <p id="statusEmissaoDiploma" role="status"></p>
+      </form>
     </details>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
       <h1 class="text-white font-cinzel font-extrabold text-lg">Cadastro de filiados</h1>
@@ -697,6 +706,36 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
           painel.append(baixar);
         }
       } catch (erro) { status.textContent = erro.message; }
+      finally { botao.disabled = false; }
+    });
+
+
+    $('formEmissaoDiploma').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const botao = event.submitter;
+      if (botao.disabled) return;
+      const status = $('statusEmissaoDiploma');
+      const numeroCompleto = $('numeroEmissaoDiploma').value.trim();
+      const match = /^([0-9]{1,15})\/([0-9]{4})$/.exec(numeroCompleto);
+      const arquivo = $('pdfEmissaoDiploma').files[0];
+      if (!match || Number(match[1]) < 1 || !arquivo || arquivo.size > 20 * 1024 * 1024 || !$('confereEmissaoDiploma').checked) {
+        status.textContent = 'Informe o protocolo oficial e confirme a conferência do PDF de até 20 MB.';
+        return;
+      }
+      if (!confirm('Registrar a emissão oficial do diploma ' + numeroCompleto + '?')) return;
+      botao.disabled = true;
+      status.textContent = 'Registrando emissão…';
+      try {
+        const bytes = await arquivo.arrayBuffer();
+        if (new TextDecoder().decode(bytes.slice(0,5)) !== '%PDF-') throw Error('Selecione um arquivo PDF válido.');
+        const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+        const p_pdf_sha256 = Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
+        const {data,error} = await sb.rpc('registrar_emissao_diploma_fikarj',{p_ano:Number(match[2]),p_numero:Number(match[1]),p_pdf_sha256});
+        if (error || !data) throw Error(error?.message || 'O Portal não confirmou o registro.');
+        status.textContent = 'Emissão registrada para ' + numeroCompleto + '.';
+        form.reset();
+      } catch (erro) { status.textContent = 'Emissão não confirmada. ' + erro.message; }
       finally { botao.disabled = false; }
     });
 
