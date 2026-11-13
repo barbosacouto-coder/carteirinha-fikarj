@@ -1274,6 +1274,7 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
         const siglas = new Set(assocs.map(a => a.sigla));
         const hoje = new Intl.DateTimeFormat('sv-SE', {timeZone:'America/Sao_Paulo'}).format(new Date());
         const pendencias = [];
+        const programacoes = [];
         const payload = [];
         let novos = 0;
         for (const {key, registro: matricula, ...campos} of parsed.rows) {
@@ -1287,18 +1288,19 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
           if (arquivados.has(registro) || cpfsArquivados.has(row.cpf) ||
               (identidade && identidade !== ant) || !siglas.has(row.associacao) ||
               !/^[0-9]{11}$/.test(row.cpf) || !row.nascimento || !/^(20[0-9]{2}|Inativo)$/.test(anuidade) ||
-              row.data_exame > hoje || (ant && (digitos(ant.cpf || '') !== row.cpf || ant.nascimento !== row.nascimento))) {
+              (row.data_exame > hoje && (!ant || !row.graduacao)) || (ant && (digitos(ant.cpf || '') !== row.cpf || ant.nascimento !== row.nascimento))) {
             pendencias.push(matricula);
             continue;
           }
           if (!ant) novos++;
+          if (row.data_exame > hoje) programacoes.push(matricula + ' (' + row.data_exame + ')');
           payload.push(row);
         }
         importPend = payload;
-        $('resumoImp').textContent = novos + ' inclusões, ' + (payload.length - novos) +
+        $('resumoImp').textContent = novos + ' inclusões, ' + (payload.length - novos - programacoes.length) +
           ' alterações e ' + pendencias.length + ' pendências excluídas do lote' +
           (pendencias.length ? ' (' + pendencias.join(', ') + ')' : '') +
-          '. Registros ausentes serão preservados.';
+          '. Exames programados: ' + (programacoes.join(', ') || 'nenhum') + '. Registros ausentes serão preservados.';
         $('btnConfImp').disabled = !payload.length;
         $('modalImp').classList.remove('hidden');
       } catch (error) { alert('Erro na prévia: ' + error.message); }
@@ -1309,14 +1311,14 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
       $('btnConfImp').disabled = true;
       const lote = importPend;
       importPend = null;
-      const {data, error} = await sb.rpc('aplicar_importacao_fikarj', {lote});
+      const {data, error} = await sb.rpc('importar_cadastro_central_fikarj', {lote});
       $('modalImp').classList.add('hidden');
       if (error) {
         alert('Importação não confirmada. Recarregue o painel e confira o estado antes de tentar novamente. ' + error.message);
         return;
       }
       await carregar();
-      $('aviso').textContent = data.incluidos + ' inclusões e ' + data.alterados + ' alterações confirmadas.';
+      $('aviso').textContent = data.incluidos + ' inclusões e ' + data.alterados + ' alterações confirmadas e ' + data.programados + ' exames programados. Carteirinhas e financeiro: consultam o cadastro central. Aniversários: próxima execução. Curso: perfis próprios preservados. Ranking, arbitragem e painéis com cópias próprias: sincronização pendente.';
     }
 
     // ---- importar ranking individual ----
