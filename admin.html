@@ -813,6 +813,32 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       finally { botao.disabled = false; }
     });
 
+    const pedidoRanking = new URLSearchParams(location.search).get('rankingLocal');
+    window.addEventListener('message', event => {
+      if (!pedidoRanking || !window.opener || event.source !== window.opener ||
+          event.data?.rankingLocal !== pedidoRanking || event.ports.length !== 1) return;
+      const porta = event.ports[0];
+      const status = $('statusCadastroRanking');
+      const botao = document.createElement('button');
+      botao.textContent = 'Atualizar cadastro no ranking privado';
+      botao.className = 'rounded bg-sky-700 px-4 py-2 text-white';
+      status.after(botao);
+      botao.onclick = async () => {
+        botao.disabled = true;
+        try {
+          const {data: admin,error: erroAdmin} = await sb.rpc('is_admin');
+          if (erroAdmin || admin !== true) throw Error('Entre com a conta administrativa.');
+          const {data,error} = await sb.from('atletas').select('registro,nome,associacao,graduacao,anuidade').not('registro','is',null).order('registro').limit(1000);
+          if (error || !data?.length || data.length >= 1000) throw Error('Cadastro indisponível ou incompleto.');
+          porta.postMessage({origem:'FIKARJ',filiados:data.map(a=>({r:a.registro,n:a.nome,e:a.associacao,g:a.graduacao,a:a.anuidade}))});
+          porta.close();
+          status.textContent = 'Cadastro enviado. Confira a confirmação no ranking.';
+        } catch(e) { status.textContent=e.message; botao.disabled=false; }
+      };
+    });
+    if (pedidoRanking && window.opener) window.addEventListener('load',()=>{
+      window.opener.postMessage({rankingPronto:pedidoRanking},'*');
+    },{once:true});
     async function exportarCadastroRanking() {
       const status = $('statusCadastroRanking');
       const {data,error} = await sb.from('atletas').select('registro,nome,associacao,graduacao,anuidade').not('registro','is',null).order('registro').limit(1000);
