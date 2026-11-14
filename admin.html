@@ -1611,7 +1611,7 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
           lista('atleta(s) do ranking 60+ ainda não cadastrados no Portal Ficast (não entraram no ranking 60+)', naoCadastrados60) +
           lista('atleta(s) do ranking 60+ com anuidade inativa (não entram no ranking 60+)', inativos60)
           : '<p class="text-gray-500">A planilha não trouxe a aba "Ranking 60+ em dia" (nem "Ranking 60+") — a posição no ranking 60+ não será alterada nesta importação.</p>') +
-        '<p class="text-amber-300 pt-2">Atenção: todos os demais atletas (que não aparecem na planilha, ou cuja anuidade não está em dia) terão o ranking individual limpo/zerado nesta importação.</p>';
+        '<p class="text-amber-300 pt-2">Os registros fora do lote serão preservados.</p>';
       $('f_rankData').value = new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = !payload.length;
       $('modalImpRank').classList.remove('hidden');
@@ -1619,18 +1619,14 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
     async function confirmarImportRanking() {
       const data = $('f_rankData').value || new Date().toISOString().slice(0, 10);
       $('btnConfImpRank').disabled = true;
-      const limparCampos = {
-        ranking_pos_geral: null, ranking_pos: null, ranking_pos_assoc_geral: null, ranking_pos_assoc: null, ranking_pontos: null, ranking_ouro: null, ranking_prata: null,
-        ranking_bronze: null, ranking_quarto: null, ranking_eventos: null, ranking_modalidades: null, ranking_atualizado_em: null
-      };
-      // só zera o ranking 60+ de todo mundo quando a planilha importada trouxe a aba de 60+; senão mantém o que já estava lá
-      if (pendRankingTem60) Object.assign(limparCampos, { ranking_pos_60: null, ranking_pontos_60: null, ranking_ouro_60: null, ranking_prata_60: null, ranking_bronze_60: null, ranking_quarto_60: null, ranking_eventos_60: null });
-      const limpar = await sb.from('atletas').update(limparCampos).gt('id', 0);
-      if (limpar.error) { alert('Erro ao limpar ranking anterior: ' + limpar.error.message); $('btnConfImpRank').disabled = false; return; }
       const linhas = pendRanking.map(p => ({ ...p, ranking_atualizado_em: data }));
-      for (let i = 0; i < linhas.length; i += 100) {
-        const { error } = await sb.from('atletas').upsert(linhas.slice(i, i + 100), { onConflict: 'registro' });
-        if (error) { alert('Erro na importação do ranking: ' + error.message); $('btnConfImpRank').disabled = false; return; }
+      const { error } = await sb.rpc('importar_ranking_atomico_fikarj', {
+        lote: linhas, incluir_60: pendRankingTem60
+      });
+      if (error) {
+        alert('Erro na importação do ranking: ' + error.message);
+        $('btnConfImpRank').disabled = false;
+        return;
       }
       $('modalImpRank').classList.add('hidden');
       $('aviso').textContent = linhas.length + ' atleta(s) com ranking atualizado em ' + data.split('-').reverse().join('/') + '.';
