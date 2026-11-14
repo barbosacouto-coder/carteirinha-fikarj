@@ -48,6 +48,10 @@
 
   <!-- PAINEL -->
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
+<details class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Arbitragem · Testar migração</summary>
+<p>Selecione o backup exportado do painel offline. A conferência roda no navegador.</p>
+<input id="backupArbitragemTeste" type="file" accept=".json">
+<pre id="resultadoArbitragemTeste" class="whitespace-pre-wrap" role="status"></pre></details>
     <button type="button" onclick="exportarCadastroRanking()" class="my-2 rounded bg-gray-800 px-3 py-2 text-white">Baixar cadastro para o ranking privado</button>
     <p id="statusCadastroRanking" role="status"></p>
     <details class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
@@ -806,6 +810,28 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       setTimeout(()=>URL.revokeObjectURL(url),1000);
       status.textContent = data.length + ' cadastros exportados para o ranking privado.';
     }
+function conferirBackupArbitragem(backup) {
+  const {state,roster} = backup;
+  if (!state || !Array.isArray(roster) || !['people','events','evaluations','payments','materials'].every(k=>Array.isArray(state[k]))) throw Error('Estrutura do backup inválida.');
+  const matriculas = roster.map(x=>Number(x.record));
+  if (matriculas.some(x=>!Number.isSafeInteger(x)||x<=0) || new Set(matriculas).size!==matriculas.length) throw Error('Matrículas inválidas ou duplicadas.');
+  if (state.events.some(e=>!Array.isArray(e.assignments))) throw Error('Escalas inválidas.');
+  const escala = state.events.flatMap(e=>e.assignments);
+  const unico = (lista,nome)=>Boolean(nome)&&lista.filter(x=>x.name===nome).length===1;
+  const divergencias = [...state.evaluations,...state.payments].filter(x=>!unico(state.people,x.person)||!unico(state.events,x.event)).length +
+    escala.filter(x=>!unico([...state.people,...roster],x.person)).length;
+  return {filiados:roster.length,pessoas:state.people.length,eventos:state.events.length,designações:escala.length,avaliações:state.evaluations.length,pagamentos:state.payments.length,materiais:state.materials.length,divergências:divergencias};
+}
+$('backupArbitragemTeste').addEventListener('change',async event=>{
+  const arquivo=event.target.files[0];
+  const saida=$('resultadoArbitragemTeste');
+  if (!arquivo) return;
+  try {
+    const resultado=conferirBackupArbitragem(JSON.parse((await arquivo.text()).replace(/^\uFEFF/,'')));
+    saida.textContent=(resultado.divergências?'Há vínculos para revisar.':'Conferência concluída.')+'\n'+Object.entries(resultado).map(([k,v])=>k+': '+v).join('\n');
+  } catch(e) { saida.textContent='Backup não validado. '+e.message; }
+});
+
     async function sair() { await sb.auth.signOut(); location.reload(); }
 
     async function iniciar() {
