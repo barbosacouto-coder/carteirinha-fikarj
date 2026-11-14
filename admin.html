@@ -48,6 +48,8 @@
 
   <!-- PAINEL -->
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
+    <button type="button" onclick="exportarCadastroRanking()" class="my-2 rounded bg-gray-800 px-3 py-2 text-white">Baixar cadastro para o ranking privado</button>
+    <p id="statusCadastroRanking" role="status"></p>
     <details class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
       <summary class="cursor-pointer font-bold text-white">Secretaria · Protocolo de documentos</summary>
       <form id="formProtocolo" class="mt-4 grid gap-3 text-gray-100">
@@ -790,6 +792,20 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       finally { botao.disabled = false; }
     });
 
+    async function exportarCadastroRanking() {
+      const status = $('statusCadastroRanking');
+      const {data,error} = await sb.from('atletas').select('registro,nome,associacao,graduacao,anuidade').not('registro','is',null).order('registro').limit(1000);
+      if (error || !data?.length || data.length >= 1000) {
+        status.textContent = 'Não foi possível exportar o cadastro completo.';
+        return;
+      }
+      const blob = new Blob([JSON.stringify({origem:'FIKARJ',gerado:new Date().toISOString(),filiados:data.map(a=>({r:a.registro,n:a.nome,e:a.associacao,g:a.graduacao,a:a.anuidade}))})],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href=url; link.download='cadastro-fikarj-ranking.json'; link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      status.textContent = data.length + ' cadastros exportados para o ranking privado.';
+    }
     async function sair() { await sb.auth.signOut(); location.reload(); }
 
     async function iniciar() {
