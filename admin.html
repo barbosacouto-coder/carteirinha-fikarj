@@ -51,6 +51,8 @@
 <details class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Arbitragem · Testar migração</summary>
 <p>Selecione o backup exportado do painel offline. A conferência roda no navegador.</p>
 <input id="backupArbitragemTeste" type="file" accept=".json">
+<button type="button" id="lerHistoricoArbitragem">Consultar histórico migrado</button>
+<pre id="historicoArbitragem" class="whitespace-pre-wrap" role="status"></pre>
 <pre id="resultadoArbitragemTeste" class="whitespace-pre-wrap" role="status"></pre></details>
     <button type="button" onclick="exportarCadastroRanking()" class="my-2 rounded bg-gray-800 px-3 py-2 text-white">Baixar cadastro para o ranking privado</button>
     <p id="statusCadastroRanking" role="status"></p>
@@ -810,6 +812,18 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       setTimeout(()=>URL.revokeObjectURL(url),1000);
       status.textContent = data.length + ' cadastros exportados para o ranking privado.';
     }
+$('lerHistoricoArbitragem').addEventListener('click',async ()=>{
+  const saida=$('historicoArbitragem');
+  saida.textContent='Consultando…';
+  try {
+    const {data,error}=await sb.rpc('arbitragem_historico_fikarj');
+    if(error || !data) throw Error('Histórico indisponível.');
+    const central = new Map(atletas.filter(a=>a.registro!=null).map(a=>[Number(a.registro),a]));
+    const vinculados = data.roster.filter(f=>central.has(Number(f.record))).length;
+    saida.textContent=Object.entries(conferirBackupArbitragem(data)).map(([k,v])=>k+': '+v).join('\n')
+      +'\nFiliados históricos com matrícula no cadastro central: '+vinculados;
+  } catch(e) { saida.textContent=e.message; }
+});
 function conferirBackupArbitragem(backup) {
   const {state,roster} = backup;
   if (!state || !Array.isArray(roster) || !['people','events','evaluations','payments','materials'].every(k=>Array.isArray(state[k]))) throw Error('Estrutura do backup inválida.');
