@@ -814,13 +814,16 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
     });
 
     const pedidoRanking = new URLSearchParams(location.search).get('rankingLocal');
+    const painelLocal = new URLSearchParams(location.search).get('painelLocal');
     window.addEventListener('message', event => {
       if (!pedidoRanking || !window.opener || event.source !== window.opener ||
           event.data?.rankingLocal !== pedidoRanking || event.ports.length !== 1) return;
       const porta = event.ports[0];
+      const aniversario = painelLocal === 'aniversarios';
+      const carteira = painelLocal === 'carteirinhas';
       const status = $('statusCadastroRanking');
       const botao = document.createElement('button');
-      botao.textContent = 'Atualizar cadastro no ranking privado';
+      botao.textContent = 'Atualizar cadastro no ' + (aniversario ? 'painel de aniversários' : carteira ? 'painel de carteirinhas' : 'ranking privado');
       botao.className = 'rounded bg-sky-700 px-4 py-2 text-white';
       status.after(botao);
       botao.onclick = async () => {
@@ -828,9 +831,9 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
         try {
           const {data: admin,error: erroAdmin} = await sb.rpc('is_admin');
           if (erroAdmin || admin !== true) throw Error('Entre com a conta administrativa.');
-          const {data,error} = await sb.from('atletas').select('registro,nome,associacao,graduacao,anuidade').not('registro','is',null).order('registro').limit(1000);
+          const {data,error} = await sb.from('atletas').select('registro,nome,associacao,graduacao,anuidade' + (aniversario ? ',nascimento,data_exame,estilo' : carteira ? ',cpf,estilo,cnkb,cargo' : '')).not('registro','is',null).order('registro').limit(1000);
           if (error || !data?.length || data.length >= 1000) throw Error('Cadastro indisponível ou incompleto.');
-          porta.postMessage({origem:'FIKARJ',filiados:data.map(a=>({r:a.registro,n:a.nome,e:a.associacao,g:a.graduacao,a:a.anuidade}))});
+          porta.postMessage({origem:'FIKARJ',filiados:data.map(a=>({r:a.registro,n:a.nome,e:a.associacao,g:a.graduacao,a:a.anuidade,...(aniversario ? {nascimento:a.nascimento,exame:a.data_exame,estilo:a.estilo} : carteira ? {cpf:a.cpf,estilo:a.estilo,cnkb:a.cnkb,cargo:a.cargo} : {})}))});
           porta.close();
           status.textContent = 'Cadastro enviado. Confira a confirmação no ranking.';
         } catch(e) { status.textContent=e.message; botao.disabled=false; }
