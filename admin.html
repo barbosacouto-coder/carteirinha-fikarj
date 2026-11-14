@@ -48,6 +48,10 @@
 
   <!-- PAINEL -->
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
+<details class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Ranking privado · Atualizar cadastro do backup</summary>
+<label>Backup do ranking <input type="file" id="backupRankingCentral" accept=".json"></label>
+<p id="statusBackupRankingCentral" role="status"></p>
+<button id="baixarBackupRankingCentral" type="button" hidden>Baixar cópia atualizada</button></details>
 <details class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Arbitragem · Novos lançamentos</summary>
 <form id="formLancarArbitragem" class="mt-3 grid gap-2">
 <label>Tipo <select name="tipo" class="bg-gray-800"><option>Escala</option><option>Avaliação</option><option>Pagamento</option></select></label>
@@ -894,6 +898,46 @@ $('formLancarArbitragem').addEventListener('submit', async event => {
     $('verLancamentosArbitragem').click();
   } catch(e) { status.textContent='Gravação não confirmada. '+e.message; }
   finally { botao.disabled=false; }
+});
+
+function atualizarCadastroBackupRanking(backup, central) {
+  if (!Array.isArray(backup?.P?.resultados) || !Array.isArray(backup.P.filiados) || !central.length) throw Error('Backup ou cadastro incompleto.');
+  const mesclar = lista => {
+    const mapa = new Map();
+    for (const f of lista) {
+      const id=Number(f.r);
+      if (!Number.isSafeInteger(id) || id<1 || mapa.has(id)) throw Error('Matrícula inválida ou duplicada no backup.');
+      mapa.set(id,f);
+    }
+    for (const a of central) {
+      const id=Number(a.registro);
+      mapa.set(id,{...mapa.get(id),r:id,n:a.nome,e:a.associacao??'',g:a.graduacao??'',a:a.anuidade??''});
+    }
+    return [...mapa.values()];
+  };
+  return {...backup,P:{...backup.P,filiados:mesclar(backup.P.filiados),filBase:mesclar(backup.P.filBase??backup.P.filiados)}};
+}
+$('backupRankingCentral').addEventListener('change',async event=>{
+  const arquivo=event.target.files[0];
+  const saida=$('statusBackupRankingCentral');
+  const baixar=$('baixarBackupRankingCentral');
+  baixar.hidden=true;
+  baixar.onclick=null;
+  if (!arquivo) return;
+  try {
+    const backup=JSON.parse(await arquivo.text());
+    const {data,error}=await sb.from('atletas').select('registro,nome,associacao,graduacao,anuidade').not('registro','is',null).order('registro').limit(1000);
+    if (error || !data?.length || data.length>=1000) throw Error('Cadastro central indisponível ou incompleto.');
+    const atualizado=atualizarCadastroBackupRanking(backup,data);
+    saida.textContent=atualizado.P.filiados.length+' filiados na cópia · '+atualizado.P.resultados.length+' resultados preservados.';
+    baixar.onclick=()=>{
+      const url=URL.createObjectURL(new Blob([JSON.stringify(atualizado)],{type:'application/json'}));
+      const link=document.createElement('a');
+      link.href=url;link.download='backup-ranking-cadastro-central.json';link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
+    baixar.hidden=false;
+  } catch(e) { saida.textContent=e.message; }
 });
 
     async function sair() { await sb.auth.signOut(); location.reload(); }
