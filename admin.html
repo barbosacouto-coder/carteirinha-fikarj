@@ -67,6 +67,13 @@
   <p id="historicoRankingStatus" role="status" class="my-2 whitespace-pre-line"></p>
   <label>Conferir pontos por atleta <input id="historicoRankingAtleta" disabled class="rounded bg-gray-800 px-2 py-1"></label>
   <p id="historicoRankingPontuacao" role="status" class="my-2 whitespace-pre-line"></p>
+  <form id="lancarResultadoHistorico" hidden class="my-3 space-y-2">
+    <label>Categoria <select name="categoria" required class="bg-gray-800"></select></label>
+    <label>Posição <select name="colocacao" class="bg-gray-800"><option value="1">1º</option><option value="2">2º</option><option value="3">3º</option><option value="4">4º / segundo bronze, conforme a regra</option></select></label>
+    <label>Matrícula FIKARJ <input name="registro" inputmode="numeric" pattern="[0-9]+" required class="rounded bg-gray-800 p-1"></label>
+    <button class="justify-self-start rounded bg-gray-700 px-3 py-2">Adicionar ao rascunho</button>
+  </form>
+  <button type="button" id="preverPublicacaoHistorico" disabled class="rounded bg-sky-700 px-3 py-2 disabled:opacity-50">Recalcular e revisar publicação</button>
 </details>
 <details class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Ranking privado · Atualizar cadastro do backup</summary>
 <label>Backup do ranking <input type="file" id="backupRankingCentral" accept=".json"></label>
@@ -463,7 +470,7 @@
   </script>
   <script>
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    import('./ranking-historico.js?v=3').then(({ iniciarHistoricoRanking }) => iniciarHistoricoRanking(sb))
+    import('./ranking-historico.js?v=4').then(({ iniciarHistoricoRanking }) => iniciarHistoricoRanking(sb, abrirPreviaHistorico, () => atletas))
       .catch(() => { document.getElementById('historicoRankingStatus').textContent = 'Não foi possível abrir o módulo de histórico.'; });
     let atletas = [], assocs = [], editando = null, importPend = null;
     const $ = id => document.getElementById(id);
@@ -1538,7 +1545,27 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
     async function lerRanking(ev) {
       const f = ev.target.files[0]; ev.target.value = '';
       if (!f) return;
-      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      revisarPlanilhaRanking(XLSX.read(await f.arrayBuffer(), { type: 'array' }));
+    }
+
+    async function abrirPreviaHistorico(pontuados) {
+      const { calcularLote } = await import('./ranking-publicacao.js?v=1');
+      const { atletas: linhas, cadastro, sessenta } = calcularLote(pontuados, atletas);
+      const registros = new Set(cadastro.map(a => a.Registro));
+      const omitidos = atletas.filter(a => ativo(a) && (a.ranking_pontos != null || a.ranking_pos_60 != null) && !registros.has(a.registro));
+      if (omitidos.length) throw new Error('A prévia omitiria ' + omitidos.length + ' atleta(s) com ranking publicado.');
+      const nomes60 = new Set(sessenta.map(a => a.Atleta));
+      if (atletas.some(a => ativo(a) && a.ranking_pos_60 != null && !nomes60.has(a.nome))) {
+        throw new Error('A prévia omitiria atleta com posição publicada no ranking 60+.');
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas), 'Atletas');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cadastro), 'Cadastro');
+      if (sessenta.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sessenta), 'Ranking 60+ em dia');
+      revisarPlanilhaRanking(wb);
+    }
+
+    function revisarPlanilhaRanking(wb) {
       const wsAtletas = wb.Sheets['Atletas'], wsCadastro = wb.Sheets['Cadastro'];
       const ws60 = wb.Sheets['Ranking 60+ em dia'] || wb.Sheets['Ranking 60+'];
       if (!wsAtletas || !wsCadastro) { alert('A planilha precisa ter as abas "Atletas" e "Cadastro" (exportação padrão do painel de ranqueamento).'); return; }
