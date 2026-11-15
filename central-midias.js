@@ -73,6 +73,7 @@ export function iniciarCentralMidias(sb) {
         <legend>Enviar arquivos para publicação</legend>
         <p class="text-sm text-slate-300">O envio cria links públicos para a Meta acessar os arquivos. Use somente materiais liberados para divulgação.</p>
         <label class="block">JPEG de até 8 MB ou MP4 de até 50 MB <input class="inp" type="file" name="arquivos" accept="image/jpeg,video/mp4,.jpg,.jpeg,.mp4" multiple></label>
+        <label class="block"><input type="checkbox" name="autorizarLinks"> Autorizo tornar estes arquivos acessíveis por link público.</label>
         <button type="button" class="rounded bg-gray-700 px-3 py-2" data-midia="enviarArquivos">Enviar arquivos e preencher links</button>
       </fieldset>
       <fieldset class="flex flex-wrap gap-3">
@@ -271,8 +272,9 @@ export function iniciarCentralMidias(sb) {
   }
 
   obter('atualizar').addEventListener('click', () => executar(atualizar));
+  form.elements.arquivos.addEventListener('change', () => { form.elements.autorizarLinks.checked = false; });
   obter('enviarArquivos').addEventListener('click', () => executar(async () => {
-    const { arquivos, formato_publicacao, midias, mimes } = form.elements;
+    const { arquivos, formato_publicacao, midias, mimes, autorizarLinks } = form.elements;
     const selecionados = Array.from(arquivos.files);
     if (!selecionados.length) throw new Error('Escolha os arquivos primeiro.');
     const { urls, tipos } = lerMidias(form);
@@ -290,9 +292,8 @@ export function iniciarCentralMidias(sb) {
       }
       return { arquivo, tipo };
     });
-    if (!window.confirm('Tornar os arquivos selecionados acessíveis por link público para a Meta?')) {
-      return 'Envio cancelado.';
-    }
+    if (!autorizarLinks.checked) throw new Error('Marque a autorização para disponibilizar os arquivos por link público.');
+    autorizarLinks.checked = false;
     const falhas = [];
     form.inert = true;
     try {
