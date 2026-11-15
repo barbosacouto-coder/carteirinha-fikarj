@@ -111,7 +111,7 @@
         <label>Data do exame <input id="dataExameDiploma" type="date" required class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Local do exame <input id="localExameDiploma" required maxlength="120" class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Professor responsável <select id="professorExameDiploma" disabled class="block w-full rounded bg-gray-800 p-2"><option value="">Informe as matrículas primeiro</option></select></label>
-        <label>Responsável externo (prévia) <input id="responsavelExternoExame" maxlength="120" class="block w-full rounded bg-gray-800 p-2"></label>
+        <label>Responsável externo pelo exame <input id="responsavelExternoExame" maxlength="120" class="block w-full rounded bg-gray-800 p-2"></label>
         <p id="statusLogoExame" class="text-sm text-gray-300" role="status">Informe a matrícula para localizar a logomarca.</p>
         <label id="campoLogoExame">Logomarca oficial da associação <input id="logoExame" type="file" accept="image/png,image/jpeg" class="block w-full rounded bg-gray-800 p-2"></label>
         <label>Protocolo oficial para preparar um diploma <input id="protocoloOficialExame" placeholder="0002/2026" pattern="[0-9]{1,15}/[0-9]{4}" class="block w-full rounded bg-gray-800 p-2"></label>
@@ -647,7 +647,6 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
         const dataExame = $('dataExameDiploma').value;
         const localExame = $('localExameDiploma').value.trim();
         const externo = $('responsavelExternoExame').value.trim();
-        if (externo && $('protocoloOficialExame').value.trim()) throw Error('Responsável externo disponível apenas para prévia de teste.');
         const professor = externo || $('professorExameDiploma').value.trim();
         if (!dataExame || !localExame || !professor) throw Error('Informe data, local e professor responsável.');
         const dataBR = dataExame.split('-').reverse().join('/');
