@@ -47,6 +47,12 @@
   </section>
 
   <!-- PAINEL -->
+  <section id="telaFinanceiroRestrito" class="hidden max-w-6xl mx-auto">
+    <div class="flex items-center justify-between gap-4 text-white">
+      <h1 class="text-xl font-bold">Financeiro da Federação</h1>
+      <button type="button" onclick="sair()" class="rounded border border-slate-600 px-3 py-2">Sair</button>
+    </div>
+  </section>
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
 <section id="visao-presidencia" aria-labelledby="tituloPresidencia" class="mb-6 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-6">
   <div class="flex flex-wrap items-start justify-between gap-3">
@@ -127,6 +133,10 @@
 <details id="presidencia-visao-financeira" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Financeiro · Visão geral</summary>
   <div id="visaoFinanceiraConteudo" class="mt-4" role="region" aria-label="Visão financeira"></div>
+</details>
+<details id="presidencia-conciliacao" class="my-4 rounded border border-gray-700 p-4 text-white">
+  <summary>Financeiro · Conciliação e estornos</summary>
+  <div id="financeiroAjustes" class="mt-4" role="region" aria-label="Conciliação e estornos"></div>
 </details>
 <details id="presidencia-financeiro" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Financeiro · Lançar pagamentos</summary>
@@ -1276,11 +1286,30 @@ $('backupRankingCentral').addEventListener('change',async event=>{
     let moduloPresidencia;
     let moduloAgenda;
 
+    function iniciarVisoesFinanceiras(podeOperar = true) {
+      return Promise.all([
+        import('./financeiro-visao.js').then(({ iniciarVisaoFinanceira }) => iniciarVisaoFinanceira(sb, $('visaoFinanceiraConteudo')))
+          .catch(() => { $('visaoFinanceiraConteudo').textContent = 'Não foi possível carregar a visão financeira.'; }),
+        import('./financeiro-ajustes.js').then(({ iniciarAjustesFinanceiros }) => iniciarAjustesFinanceiros(sb, podeOperar))
+          .catch(() => { $('financeiroAjustes').textContent = 'Não foi possível carregar a conciliação e os estornos.'; }),
+      ]);
+    }
+
     async function iniciar() {
       const { data: s } = await sb.auth.getSession();
       if (!s.session) return;
       const { data: adm } = await sb.from('admins').select('email');
       if (!adm || !adm.length) {
+        const { data: papel } = await sb.rpc('pag_papel');
+        if (papel === 'admin' || papel === 'consulta') {
+          const tela = $('telaFinanceiroRestrito');
+          tela.append($('presidencia-visao-financeira'), $('presidencia-conciliacao'));
+          $('telaLogin').classList.add('hidden');
+          tela.classList.remove('hidden');
+          $('presidencia-conciliacao').open = true;
+          await iniciarVisoesFinanceiras(papel === 'admin');
+          return;
+        }
         await sb.auth.signOut();
         $('msgLogin').textContent = 'Este usuário não tem permissão de administrador.';
         return;
@@ -1294,8 +1323,7 @@ $('backupRankingCentral').addEventListener('change',async event=>{
           .catch(() => { $('presidenciaStatus').textContent = 'Indicadores indisponíveis. As áreas operacionais continuam acessíveis.'; }),
         (moduloAgenda ??= import('./agenda-institucional.js')).then(({ iniciarAgendaInstitucional }) => iniciarAgendaInstitucional(sb))
           .catch(() => { $('presidencia-agenda').querySelector('[role="status"]').textContent = 'Não foi possível carregar a agenda.'; }),
-        import('./financeiro-visao.js').then(({ iniciarVisaoFinanceira }) => iniciarVisaoFinanceira(sb, $('visaoFinanceiraConteudo')))
-          .catch(() => { $('visaoFinanceiraConteudo').textContent = 'Não foi possível carregar a visão financeira.'; }),
+        iniciarVisoesFinanceiras(),
       ]);
     }
 
