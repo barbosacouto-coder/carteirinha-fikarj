@@ -32,6 +32,11 @@ function lerMidias(form) {
   if (tipos.length !== urls.length || tipos.some(tipo => !tiposDeArquivo.has(tipo))) {
     throw new Error('Informe um tipo válido para cada link, na mesma ordem.');
   }
+  const reel = form.elements.formato_publicacao.value === 'reel';
+  const esperado = reel ? 'video/mp4' : 'image/jpeg';
+  if (tipos.some(tipo => tipo !== esperado)) {
+    throw new Error(reel ? 'Reel aceita somente vídeo MP4.' : 'Este carrossel aceita somente imagens JPEG.');
+  }
   return { urls, tipos };
 }
 
@@ -131,10 +136,10 @@ export function iniciarCentralMidias(sb) {
   function atualizarFormato() {
     const formato = form.elements.formato_publicacao.value;
     form.elements.arquivos.multiple = formato !== 'reel';
-    form.elements.arquivos.accept = formato === 'reel' ? 'video/mp4,.mp4' : 'image/jpeg,video/mp4,.jpg,.jpeg,.mp4';
+    form.elements.arquivos.accept = formato === 'reel' ? 'video/mp4,.mp4' : 'image/jpeg,.jpg,.jpeg';
     obter('instrucoesFormato').textContent = formato === 'reel'
       ? 'Use um vídeo MP4 com o tipo video/mp4.'
-      : 'Use de 2 a 10 arquivos JPEG ou MP4, com os tipos image/jpeg ou video/mp4.';
+      : 'Use de 2 a 10 imagens JPEG, com o tipo image/jpeg.';
     for (const campo of form.querySelectorAll('[name="destino"]')) {
       campo.disabled = !formatos[formato].includes(campo.value);
       if (campo.disabled) campo.checked = false;
@@ -283,7 +288,7 @@ export function iniciarCentralMidias(sb) {
     if (urls.length + selecionados.length > limite) throw new Error('O formato aceita até ' + limite + ' arquivo(s).');
     const arquivosTipados = selecionados.map(arquivo => {
       const tipo = arquivo.type || tipoPelaExtensao(arquivo.name);
-      if (!tiposDeArquivo.has(tipo) || (reel && tipo !== 'video/mp4')) {
+      if (tipo !== (reel ? 'video/mp4' : 'image/jpeg')) {
         throw new Error('Arquivo incompatível com o formato selecionado: ' + arquivo.name);
       }
       const tamanhoMaximo = tipo === 'image/jpeg' ? 8 : 50;
