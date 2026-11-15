@@ -60,6 +60,10 @@
   <summary>Resultados e ranking · Conferir histórico</summary>
   <p class="my-2">Selecione um backup do Painel Integrado para conferir a estrutura e as contagens antes da migração.</p>
   <label>Backup do Painel Integrado <input type="file" id="historicoRankingArquivo" accept=".json,application/json"></label>
+  <div class="my-2 flex flex-wrap gap-2">
+    <button type="button" id="salvarHistoricoRanking" disabled class="rounded bg-sky-700 px-3 py-2 disabled:opacity-50">Guardar histórico</button>
+    <button type="button" id="consultarHistoricoRanking" class="rounded border border-gray-600 px-3 py-2">Consultar histórico guardado</button>
+  </div>
   <p id="historicoRankingStatus" role="status" class="my-2 whitespace-pre-line"></p>
 </details>
 <details class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Ranking privado · Atualizar cadastro do backup</summary>
@@ -457,6 +461,8 @@
   </script>
   <script>
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    import('./ranking-historico.js').then(({ iniciarHistoricoRanking }) => iniciarHistoricoRanking(sb))
+      .catch(() => { document.getElementById('historicoRankingStatus').textContent = 'Não foi possível abrir o módulo de histórico.'; });
     let atletas = [], assocs = [], editando = null, importPend = null;
     const $ = id => document.getElementById(id);
     const ativo = a => /202[67]/.test(String(a.anuidade));
@@ -1697,7 +1703,6 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
     $('confirmarAnuidadesPresidencia').onclick = () => consultarAnuidadesPresidencia(true);
     iniciar();
   </script>
-<script type="module" src="ranking-historico.js"></script>
 </body>
 </html>
 

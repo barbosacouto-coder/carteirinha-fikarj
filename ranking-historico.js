@@ -19,24 +19,72 @@ export function conferirHistorico(backup) {
   return { resultados: ids.size, eventos };
 }
 
-const arquivo = globalThis.document?.getElementById('historicoRankingArquivo');
-arquivo?.addEventListener('change', async () => {
-  const resultado = document.getElementById('historicoRankingStatus');
-  const selecionado = arquivo.files[0];
-  resultado.textContent = '';
-  if (!selecionado) return;
-  try {
-    const backup = JSON.parse((await selecionado.text()).replace(/^\uFEFF/, ''));
-    if (arquivo.files[0] !== selecionado) return;
+export function iniciarHistoricoRanking(sb) {
+  const arquivo = document.getElementById('historicoRankingArquivo');
+  const status = document.getElementById('historicoRankingStatus');
+  const salvar = document.getElementById('salvarHistoricoRanking');
+  const consultar = document.getElementById('consultarHistoricoRanking');
+  let dados;
+
+  function mostrar(backup, mensagem) {
     const resumo = conferirHistorico(backup);
-    resultado.textContent = [
+    status.textContent = [
       `${resumo.resultados} resultados em ${resumo.eventos.size} eventos.`,
-      ...Array.from(resumo.eventos, ([evento, total]) => `${evento} · ${total} resultados`),
-      'Conferência concluída. Nenhum dado foi gravado.',
+      mensagem,
     ].join('\n');
-  } catch (erro) {
-    if (arquivo.files[0] === selecionado) {
-      resultado.textContent = erro instanceof SyntaxError ? 'O arquivo não contém JSON válido.' : erro.message;
-    }
   }
-});
+
+  arquivo.addEventListener('change', async () => {
+    const selecionado = arquivo.files[0];
+    dados = undefined;
+    salvar.disabled = true;
+    status.textContent = '';
+    if (!selecionado) return;
+    try {
+      const backup = JSON.parse((await selecionado.text()).replace(/^\uFEFF/, ''));
+      if (arquivo.files[0] !== selecionado) return;
+      mostrar(backup, 'Arquivo conferido. Você pode guardar esta versão no Portal.');
+      const { resultados, esquemas, pesos, k4, catsExtra } = backup.P;
+      dados = { resultados, esquemas, pesos, k4, catsExtra };
+      salvar.disabled = false;
+    } catch (erro) {
+      if (arquivo.files[0] === selecionado) {
+        status.textContent = erro instanceof SyntaxError ? 'O arquivo não contém JSON válido.' : erro.message;
+      }
+    }
+  });
+
+  salvar.addEventListener('click', async () => {
+    if (!dados) return;
+    arquivo.disabled = salvar.disabled = consultar.disabled = true;
+    try {
+      const { error } = await sb.from('ranking_historico_fikarj').insert({ dados });
+      if (error?.code === '23505') {
+        mostrar({ P: dados }, 'Esta versão já está guardada no Portal.');
+      } else if (error) {
+        throw error;
+      } else {
+        mostrar({ P: dados }, 'Histórico guardado. O ranking publicado permanece com a versão atual.');
+      }
+    } catch {
+      status.textContent = 'O Portal não conseguiu guardar o histórico. Você pode tentar novamente.';
+    } finally {
+      arquivo.disabled = salvar.disabled = consultar.disabled = false;
+    }
+  });
+
+  consultar.addEventListener('click', async () => {
+    consultar.disabled = true;
+    try {
+      const { data, error } = await sb.from('ranking_historico_fikarj')
+        .select('dados').order('criado_em', { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      if (data) mostrar({ P: data.dados }, 'Último histórico guardado no Portal.');
+      else status.textContent = 'Ainda não há histórico guardado.';
+    } catch {
+      status.textContent = 'O Portal não conseguiu consultar o histórico.';
+    } finally {
+      consultar.disabled = false;
+    }
+  });
+}
