@@ -48,6 +48,24 @@
 
   <!-- PAINEL -->
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
+<details class="my-4 rounded border border-gray-700 p-4 text-white">
+  <summary>Financeiro · Lançar pagamentos</summary>
+  <form id="lancarPagamentoPortal" class="mt-3 grid gap-3">
+    <label>Tipo <select name="tipo" class="inp"><option value="anuidade_fikarj">Anuidade FIKARJ</option><option value="anuidade_cnkb">Anuidade CNKB</option><option value="evento">Taxa de evento</option><option value="curso">Pagamento de curso</option></select></label>
+    <label>Matrícula FIKARJ <input name="registro" required inputmode="numeric" pattern="[0-9]+" class="inp"></label>
+    <label id="anoPagamentoPortal">Ano da anuidade <input name="ano" required type="number" min="2000" max="2099" value="2027" class="inp"></label>
+    <label id="cobrancaPagamentoPortal" hidden>Cobrança <select name="cobranca" class="inp"></select></label>
+    <label>Data do pagamento <input name="data" type="date" required class="inp"></label>
+    <label>Valor recebido (R$) <input name="valor" type="number" min="0.01" step="0.01" required class="inp"></label>
+    <label>Forma <select name="forma" class="inp"><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option><option value="boleto">Boleto</option><option value="cartao">Cartão</option><option value="outro">Outro</option></select></label>
+    <label>Observação <input name="observacao" maxlength="500" class="inp"></label>
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" class="rounded bg-gray-700 p-2">Revisar lançamento</button>
+      <button id="confirmarPagamentoPortal" type="button" disabled class="rounded bg-sky-700 p-2 disabled:opacity-50">Registrar pagamento</button>
+    </div>
+    <p id="statusPagamentoPortal" role="status" class="whitespace-pre-line"></p>
+  </form>
+</details>
 <details class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4 text-white">
   <summary>Financeiro · Confirmação de anuidades pela Presidência</summary>
   <label class="block mt-3">Ano das anuidades <input id="anoConfirmacaoAnuidades" type="number" value="2027" class="rounded bg-gray-800 p-2"></label>
@@ -498,6 +516,8 @@
       .catch(() => { document.getElementById('historicoRankingStatus').textContent = 'Não foi possível abrir o módulo de histórico.'; });
     let atletas = [], assocs = [], editando = null, importPend = null;
     const $ = id => document.getElementById(id);
+    import('./financeiro-pagamentos.js').then(({ iniciarPagamentos }) => iniciarPagamentos(sb, () => atletas))
+      .catch(() => { $('statusPagamentoPortal').textContent = 'Não foi possível abrir o módulo de pagamentos.'; });
     const ativo = a => /202[67]/.test(String(a.anuidade));
     const mapNome = () => Object.fromEntries(assocs.map(s => [s.sigla, s.nome]));
     const digitos = s => String(s || '').replace(/\D/g, '');
