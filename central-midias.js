@@ -13,6 +13,7 @@ const formatos = {
   reel: ['instagram_reel', 'facebook_reel'],
 };
 const tiposDeArquivo = new Set(['image/jpeg', 'video/mp4']);
+const bucketPublicacao = 'central-midias-publicacao';
 
 function linhas(texto) {
   return texto.trim().split(/\r?\n/).map(linha => linha.trim()).filter(Boolean);
@@ -22,6 +23,16 @@ function tipoPelaExtensao(url) {
   if (/\.jpe?g$/i.test(url)) return 'image/jpeg';
   if (/\.mp4$/i.test(url)) return 'video/mp4';
   return '';
+}
+
+function lerMidias(form) {
+  const urls = linhas(form.elements.midias.value);
+  const mimes = form.elements.mimes.value.trim();
+  const tipos = mimes ? linhas(mimes).map(tipo => tipo.toLowerCase()) : urls.map(tipoPelaExtensao);
+  if (tipos.length !== urls.length || tipos.some(tipo => !tiposDeArquivo.has(tipo))) {
+    throw new Error('Informe um tipo válido para cada link, na mesma ordem.');
+  }
+  return { urls, tipos };
 }
 
 export function iniciarCentralMidias(sb) {
@@ -58,6 +69,12 @@ export function iniciarCentralMidias(sb) {
       <p class="text-sm text-slate-300" data-midia="instrucoesFormato"></p>
       <label class="block">Links públicos HTTPS sem parâmetros, um por linha <textarea class="inp" name="midias" rows="3"></textarea></label>
       <label class="block">Tipos de arquivo, na mesma ordem dos links <textarea class="inp" name="mimes" placeholder="Automático para links .jpg, .jpeg e .mp4" rows="2"></textarea></label>
+      <fieldset class="space-y-2 rounded border border-gray-700 p-3">
+        <legend>Enviar arquivos para publicação</legend>
+        <p class="text-sm text-slate-300">O envio cria links públicos para a Meta acessar os arquivos. Use somente materiais liberados para divulgação.</p>
+        <label class="block">JPEG de até 8 MB ou MP4 de até 50 MB <input class="inp" type="file" name="arquivos" accept="image/jpeg,video/mp4,.jpg,.jpeg,.mp4" multiple></label>
+        <button type="button" class="rounded bg-gray-700 px-3 py-2" data-midia="enviarArquivos">Enviar arquivos e preencher links</button>
+      </fieldset>
       <fieldset class="flex flex-wrap gap-3">
         <legend>Destinos</legend>
         <label><input type="checkbox" name="destino" value="instagram_carousel"> Carrossel no Instagram</label>
@@ -112,6 +129,8 @@ export function iniciarCentralMidias(sb) {
 
   function atualizarFormato() {
     const formato = form.elements.formato_publicacao.value;
+    form.elements.arquivos.multiple = formato !== 'reel';
+    form.elements.arquivos.accept = formato === 'reel' ? 'video/mp4,.mp4' : 'image/jpeg,video/mp4,.jpg,.jpeg,.mp4';
     obter('instrucoesFormato').textContent = formato === 'reel'
       ? 'Use um vídeo MP4 com o tipo video/mp4.'
       : 'Use de 2 a 10 arquivos JPEG ou MP4, com os tipos image/jpeg ou video/mp4.';
@@ -122,6 +141,7 @@ export function iniciarCentralMidias(sb) {
   }
 
   function editar(item) {
+    if (raiz.getAttribute('aria-busy') === 'true') return;
     editando = item;
     form.reset();
     obter('tituloForm').textContent = item ? 'Editar conteúdo' : 'Novo rascunho';
@@ -251,17 +271,62 @@ export function iniciarCentralMidias(sb) {
   }
 
   obter('atualizar').addEventListener('click', () => executar(atualizar));
+  obter('enviarArquivos').addEventListener('click', () => executar(async () => {
+    const { arquivos, formato_publicacao, midias, mimes } = form.elements;
+    const selecionados = Array.from(arquivos.files);
+    if (!selecionados.length) throw new Error('Escolha os arquivos primeiro.');
+    const { urls, tipos } = lerMidias(form);
+    const reel = formato_publicacao.value === 'reel';
+    const limite = reel ? 1 : 10;
+    if (urls.length + selecionados.length > limite) throw new Error('O formato aceita até ' + limite + ' arquivo(s).');
+    const arquivosTipados = selecionados.map(arquivo => {
+      const tipo = arquivo.type || tipoPelaExtensao(arquivo.name);
+      if (!tiposDeArquivo.has(tipo) || (reel && tipo !== 'video/mp4')) {
+        throw new Error('Arquivo incompatível com o formato selecionado: ' + arquivo.name);
+      }
+      const tamanhoMaximo = tipo === 'image/jpeg' ? 8 : 50;
+      if (!arquivo.size || arquivo.size > tamanhoMaximo * 1024 * 1024) {
+        throw new Error('Arquivo vazio ou maior que ' + tamanhoMaximo + ' MB: ' + arquivo.name);
+      }
+      return { arquivo, tipo };
+    });
+    if (!window.confirm('Tornar os arquivos selecionados acessíveis por link público para a Meta?')) {
+      return 'Envio cancelado.';
+    }
+    const falhas = [];
+    form.inert = true;
+    try {
+      const { data, error } = await sb.auth.getUser();
+      if (error || !data?.user?.id) throw new Error('Entre novamente no Painel para enviar os arquivos.');
+      const bucket = sb.storage.from(bucketPublicacao);
+      for (const { arquivo, tipo } of arquivosTipados) {
+        const extensao = tipo === 'image/jpeg' ? 'jpg' : 'mp4';
+        const caminho = data.user.id + '/' + crypto.randomUUID() + '.' + extensao;
+        try {
+          const { error: erroEnvio } = await bucket.upload(caminho, arquivo, { contentType: tipo, upsert: false });
+          if (erroEnvio) throw erroEnvio;
+          urls.push(bucket.getPublicUrl(caminho).data.publicUrl);
+          tipos.push(tipo);
+        } catch {
+          falhas.push(arquivo.name);
+        }
+      }
+      midias.value = urls.join('\n');
+      mimes.value = tipos.join('\n');
+      arquivos.value = '';
+    } finally {
+      form.inert = false;
+    }
+    if (falhas.length) return 'Falha no envio de ' + falhas.join(', ') + '. Confira os links preenchidos antes de tentar novamente.';
+    return 'Links preenchidos. Salve o conteúdo para registrar as mídias no rascunho.';
+  }));
   form.addEventListener('submit', evento => {
     evento.preventDefault();
     executar(async () => {
-      const { tema, legenda, midias, mimes, formato_publicacao, quando } = form.elements;
-      const urls = linhas(midias.value);
-      const tipos = mimes.value.trim() ? linhas(mimes.value).map(tipo => tipo.toLowerCase()) : urls.map(tipoPelaExtensao);
+      const { tema, legenda, formato_publicacao, quando } = form.elements;
+      const { urls, tipos } = lerMidias(form);
       if (!tema.value.trim()) throw new Error('Informe o tema.');
       if (urls.length > 10) throw new Error('Use até 10 links de mídia.');
-      if (tipos.length !== urls.length || tipos.some(tipo => !tiposDeArquivo.has(tipo))) {
-        throw new Error('Informe um tipo válido para cada link, na mesma ordem.');
-      }
       for (const endereco of urls) {
         if (endereco.length > 2048 || !/^https:\/\/[a-zA-Z0-9.-]+(?:\/[^?#\s\\]*)?$/.test(endereco)) {
           throw new Error('Informe links HTTPS públicos sem parâmetros ou credenciais.');
