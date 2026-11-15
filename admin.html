@@ -56,13 +56,14 @@
   <p id="presidenciaStatus" role="status" class="my-3 text-sm text-slate-300">Aguardando consulta ao Portal.</p>
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
     <a href="#presidencia-secretaria" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaDocumentos" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Documentos em rascunho</span><span class="block text-xs text-slate-300">Secretaria</span></a>
-    <a href="#presidencia-financeiro" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaCobrancas" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Cobranças com saldo</span><span class="block text-xs text-slate-300"><span id="presidenciaVencidas">—</span> vencidas · cobranças registradas</span></a>
+    <a href="#presidencia-visao-financeira" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaCobrancas" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Visão financeira · cobranças com saldo</span><span class="block text-xs text-slate-300"><span id="presidenciaVencidas">—</span> vencidas · cobranças registradas</span></a>
     <button id="presidenciaAbrirFotos" type="button" class="rounded-xl border border-slate-700 bg-slate-800 p-4 text-left text-white hover:border-sky-400"><strong id="presidenciaFotos" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Fotos pendentes</span><span class="block text-xs text-slate-300">Revisar fotos de carteirinha</span></button>
     <a href="#presidencia-cadastro" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaFiliados" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Cadastros de filiados</span><span class="block text-xs text-slate-300">Cadastro Central</span></a>
   </div>
   <nav aria-label="Acessos da Presidência" class="mt-4 flex flex-wrap gap-2 text-sm">
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-agenda">Agenda e responsabilidades</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-anuidades">Confirmar anuidades</a>
+    <button type="button" onclick="abrirRanking()" class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800">Ver ranking publicado</button>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-ranking">Resultados e relatórios</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-arbitragem">Arbitragem</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="?modulo=carteirinhas">Carteirinhas</a>
@@ -123,6 +124,10 @@
   <ul class="grid gap-2 sm:grid-cols-2"></ul>
 </details>
 
+<details id="presidencia-visao-financeira" class="my-4 rounded border border-gray-700 p-4 text-white">
+  <summary>Financeiro · Visão geral</summary>
+  <div id="visaoFinanceiraConteudo" class="mt-4" role="region" aria-label="Visão financeira"></div>
+</details>
 <details id="presidencia-financeiro" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Financeiro · Lançar pagamentos</summary>
   <details class="my-3 rounded border border-gray-700 p-3">
@@ -188,6 +193,7 @@
 </details>
 <details id="presidencia-ranking" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Resultados e ranking · Conferir histórico</summary>
+  <p class="my-2"><button type="button" onclick="abrirRanking()" class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800">Ver ranking publicado</button></p>
   <p class="my-2">Selecione um backup do Painel Integrado para conferir a estrutura e as contagens antes da migração.</p>
   <label>Backup do Painel Integrado <input type="file" id="historicoRankingArquivo" accept=".json,application/json"></label>
   <div class="my-2 flex flex-wrap gap-2">
@@ -440,7 +446,7 @@
   <div id="modalRanking" class="hidden fixed inset-0 bg-black/70 z-40 overflow-y-auto p-4">
     <div class="max-w-3xl mx-auto bg-gray-900 border border-gray-700 rounded-2xl p-5 mt-6">
       <div class="flex items-center justify-between mb-3 gap-3">
-        <h2 class="text-white font-bold">Rankings FIKARJ 2026</h2>
+        <h2 class="text-white font-bold">Rankings publicados · FIKARJ</h2>
         <div class="flex gap-2">
           <button onclick="exportarRankingPDF()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-3 py-2 rounded-lg">Exportar PDF</button>
           <button onclick="document.getElementById('modalRanking').classList.add('hidden')" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs px-3 py-2 rounded-lg">Fechar</button>
@@ -452,7 +458,10 @@
         <button id="abaRankF" onclick="trocarAbaRanking('F')" class="px-3 py-2 rounded-lg font-semibold">Feminino</button>
         <button id="abaRankAssoc" onclick="trocarAbaRanking('assoc')" class="px-3 py-2 rounded-lg font-semibold">Por associação</button>
         <button id="abaRank60" onclick="trocarAbaRanking('60')" class="px-3 py-2 rounded-lg font-semibold">60+</button>
-        <select id="selAssocRanking" onchange="renderRanking()" class="inp hidden" style="max-width:220px"></select>
+        <select id="selAssocRanking" aria-label="Associação do ranking" onchange="renderRanking()" class="inp hidden" style="max-width:220px"></select>
+        <select id="selSexoAssocRanking" aria-label="Classificação da associação" onchange="renderRanking()" class="inp hidden">
+          <option value="">Geral da associação</option><option value="M">Masculino da associação</option><option value="F">Feminino da associação</option>
+        </select>
       </div>
       <p id="rankingAtualizadoEm" class="text-[11px] text-gray-500 mb-2 min-h-[1rem]"></p>
       <div class="overflow-x-auto border border-gray-800 rounded-xl">
@@ -1285,6 +1294,8 @@ $('backupRankingCentral').addEventListener('change',async event=>{
           .catch(() => { $('presidenciaStatus').textContent = 'Indicadores indisponíveis. As áreas operacionais continuam acessíveis.'; }),
         (moduloAgenda ??= import('./agenda-institucional.js')).then(({ iniciarAgendaInstitucional }) => iniciarAgendaInstitucional(sb))
           .catch(() => { $('presidencia-agenda').querySelector('[role="status"]').textContent = 'Não foi possível carregar a agenda.'; }),
+        import('./financeiro-visao.js').then(({ iniciarVisaoFinanceira }) => iniciarVisaoFinanceira(sb, $('visaoFinanceiraConteudo')))
+          .catch(() => { $('visaoFinanceiraConteudo').textContent = 'Não foi possível carregar a visão financeira.'; }),
       ]);
     }
 
@@ -1597,6 +1608,7 @@ $('backupRankingCentral').addEventListener('change',async event=>{
     let abaRankingAtual = 'geral';
     function abrirRanking() {
       $('selAssocRanking').innerHTML = assocs.map(s => `<option value="${s.sigla}">${s.sigla}</option>`).join('');
+      $('selSexoAssocRanking').value = '';
       trocarAbaRanking('geral');
       $('modalRanking').classList.remove('hidden');
     }
@@ -1607,6 +1619,7 @@ $('backupRankingCentral').addEventListener('change',async event=>{
         $(id).className = 'px-3 py-2 rounded-lg font-semibold ' + (k === aba ? 'bg-sky-500 text-white' : 'bg-gray-800 border border-gray-700 text-gray-200');
       });
       $('selAssocRanking').classList.toggle('hidden', aba !== 'assoc');
+      $('selSexoAssocRanking').classList.toggle('hidden', aba !== 'assoc');
       renderRanking();
     }
     let rankingListaAtual = [], rankingCampoPosAtual = '';
@@ -1623,8 +1636,9 @@ $('backupRankingCentral').addEventListener('change',async event=>{
         campoPos = 'ranking_pos_60';
       } else {
         const as = $('selAssocRanking').value;
-        lista = atletas.filter(a => a.associacao === as && a.ranking_pos_assoc_geral).sort((x, y) => x.ranking_pos_assoc_geral - y.ranking_pos_assoc_geral);
-        campoPos = 'ranking_pos_assoc_geral';
+        const sexo = $('selSexoAssocRanking').value;
+        campoPos = sexo ? 'ranking_pos_assoc' : 'ranking_pos_assoc_geral';
+        lista = atletas.filter(a => a.associacao === as && (!sexo || a.sexo === sexo) && a[campoPos]).sort((x, y) => x[campoPos] - y[campoPos]);
       }
       rankingListaAtual = lista; rankingCampoPosAtual = campoPos;
       const suf = abaRankingAtual === '60' ? '_60' : '';
@@ -1713,6 +1727,8 @@ $('backupRankingCentral').addEventListener('change',async event=>{
     function exportarRankingPDF() {
       if (!rankingListaAtual.length) { return; }
       const titulos = { geral: 'Ranking Geral FIKARJ', M: 'Ranking Geral Masculino', F: 'Ranking Geral Feminino', assoc: 'Ranking Geral da Associação ' + $('selAssocRanking').value, '60': 'Ranking 60+ (geral, masculino e feminino juntos)' };
+      const sexoAssoc = $('selSexoAssocRanking').value;
+      if (sexoAssoc) titulos.assoc = 'Ranking ' + (sexoAssoc === 'M' ? 'Masculino' : 'Feminino') + ' da Associação ' + $('selAssocRanking').value;
       const sufExp = abaRankingAtual === '60' ? '_60' : '';
       const linhas = rankingListaAtual.map(a => ({
         pos: a[rankingCampoPosAtual] + 'º',
@@ -1734,7 +1750,7 @@ $('backupRankingCentral').addEventListener('change',async event=>{
       ];
       const ult = rankingListaAtual[0].ranking_atualizado_em;
       const subtitulo = 'FIKARJ 2026 · ' + (ult ? 'atualizado em ' + ult.split('-').reverse().join('/') : 'gerado em ' + new Date().toLocaleDateString('pt-BR'));
-      const nomeArq = 'Ranking_FIKARJ_' + abaRankingAtual + (abaRankingAtual === 'assoc' ? '_' + $('selAssocRanking').value : '') + '.pdf';
+      const nomeArq = 'Ranking_FIKARJ_' + abaRankingAtual + (abaRankingAtual === 'assoc' ? '_' + $('selAssocRanking').value + (sexoAssoc ? '_' + sexoAssoc : '') : '') + '.pdf';
       gerarPDFLista(titulos[abaRankingAtual], subtitulo, colunas, linhas, nomeArq);
     }
 
