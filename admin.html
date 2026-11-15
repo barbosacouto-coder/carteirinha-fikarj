@@ -50,6 +50,43 @@
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
 <details class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Financeiro · Lançar pagamentos</summary>
+  <details class="my-3 rounded border border-gray-700 p-3">
+    <summary>Cadastrar evento ou curso no financeiro</summary>
+    <form id="cadastrarEventoFinanceiro" class="mt-3 space-y-2">
+      <label class="block">Nome <input name="nome" required maxlength="140" class="inp"></label>
+      <label class="block">Tipo <select name="tipo" class="inp">
+        <option value="campeonato">Campeonato</option><option value="curso">Curso</option>
+        <option value="seminario">Seminário</option><option value="exame">Exame</option><option value="outro">Outro</option>
+      </select></label>
+      <label class="block">Data <input name="data" type="date" required class="inp"></label>
+      <label class="block">Local <input name="local" maxlength="140" class="inp"></label>
+      <label class="block"><input type="checkbox" name="contaDesconto"> Contar para o desconto de anuidade</label>
+      <button type="submit" class="rounded bg-gray-700 p-2">Cadastrar no financeiro</button>
+    </form>
+    <p id="statusEventoFinanceiro" role="status" class="mt-2"></p>
+  </details>
+  <details id="configurarTarifaFinanceiro" class="my-3 rounded border border-gray-700 p-3">
+    <summary>Cadastrar valor aprovado</summary>
+    <form id="cadastrarTarifaFinanceiro" class="mt-3 space-y-2">
+      <label class="block">Evento ou curso <select name="evento" required class="inp"><option value="">Selecione</option></select></label>
+      <label class="block">Categoria da cobrança <input name="categoria" required maxlength="120" class="inp"></label>
+      <label class="block">Valor aprovado (R$) <input name="valor" type="number" min="0" step="0.01" required class="inp"></label>
+      <button type="submit" class="rounded bg-gray-700 p-2">Cadastrar valor</button>
+    </form>
+    <p id="statusTarifaFinanceiro" role="status" class="mt-2"></p>
+  </details>
+  <details class="my-3 rounded border border-gray-700 p-3">
+    <summary>Criar cobrança de evento ou curso</summary>
+    <form id="criarCobrancaPortal" class="mt-3 space-y-2">
+      <label class="block">Matrícula FIKARJ <input name="registro" required inputmode="numeric" pattern="[0-9]+" class="inp"></label>
+      <label class="block">Evento ou curso <select name="evento" required class="inp"><option value="">Selecione</option></select></label>
+      <label class="block">Descrição <input name="descricao" readonly class="inp"></label>
+      <label class="block">Valor aprovado <select name="valor" required class="inp"><option value="">Selecione</option></select></label>
+      <label class="block">Vencimento <input name="vencimento" type="date" required class="inp"></label>
+      <button type="submit" class="rounded bg-gray-700 p-2">Criar cobrança</button>
+    </form>
+    <p id="statusCobrancaPortal" role="status" class="mt-2"></p>
+  </details>
   <form id="lancarPagamentoPortal" class="mt-3 grid gap-3">
     <label>Tipo <select name="tipo" class="inp"><option value="anuidade_fikarj">Anuidade FIKARJ</option><option value="anuidade_cnkb">Anuidade CNKB</option><option value="evento">Taxa de evento</option><option value="curso">Pagamento de curso</option></select></label>
     <label>Matrícula FIKARJ <input name="registro" required inputmode="numeric" pattern="[0-9]+" class="inp"></label>
@@ -516,6 +553,91 @@
       .catch(() => { document.getElementById('historicoRankingStatus').textContent = 'Não foi possível abrir o módulo de histórico.'; });
     let atletas = [], assocs = [], editando = null, importPend = null;
     const $ = id => document.getElementById(id);
+    $('cadastrarEventoFinanceiro').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const status = $('statusEventoFinanceiro');
+      const botao = form.querySelector('button');
+      if (botao.disabled) return;
+      const campos = new FormData(form);
+      const nome = campos.get('nome').trim();
+      const tipo = campos.get('tipo');
+      const data = campos.get('data');
+      const local = campos.get('local').trim();
+      if (!nome || !data) { status.textContent = 'Informe o nome e a data.'; return; }
+      botao.disabled = true;
+      status.textContent = 'Conferindo cadastro…';
+      try {
+        const consulta = await sb.from('pag_eventos').select('id,nome').eq('tipo', tipo).eq('data', data);
+        if (consulta.error) throw consulta.error;
+        const chave = texto => texto.trim().toLocaleLowerCase('pt-BR');
+        if (consulta.data.some(e => chave(e.nome) === chave(nome))) {
+          status.textContent = 'Já existe um cadastro com esse nome, tipo e data.';
+          return;
+        }
+        const resposta = await sb.from('pag_eventos').insert({ nome, tipo, data, local: local || null, conta_para_desconto: campos.has('contaDesconto') });
+        if (resposta.error) throw resposta.error;
+        form.reset();
+        status.textContent = 'Evento ou curso cadastrado no financeiro.';
+        document.dispatchEvent(new Event('financeiro:eventos-atualizados'));
+      } catch (erro) {
+        status.textContent = erro.message || 'Não foi possível cadastrar.';
+      } finally {
+        botao.disabled = false;
+      }
+    });
+    {
+      const painel = $('configurarTarifaFinanceiro');
+      const form = $('cadastrarTarifaFinanceiro');
+      const status = $('statusTarifaFinanceiro');
+      const eventos = form.elements.evento;
+      const botao = form.querySelector('button');
+      async function listarEventosDaTarifa() {
+        if (!painel.open) return;
+        const { data, error } = await sb.from('pag_eventos').select('id,nome,tipo,data').order('data', { ascending: false });
+        if (error) { status.textContent = 'Não foi possível consultar os eventos e cursos.'; return; }
+        const selecionado = eventos.value;
+        eventos.replaceChildren(new Option('Selecione', ''), ...data.map(item =>
+          new Option([item.nome, item.tipo, item.data].join(' · '), String(item.id))));
+        if (data.some(item => String(item.id) === selecionado)) eventos.value = selecionado;
+      }
+      painel.addEventListener('toggle', listarEventosDaTarifa);
+      document.addEventListener('financeiro:eventos-atualizados', listarEventosDaTarifa);
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (botao.disabled) return;
+        const dados = new FormData(form);
+        const evento_id = Number(dados.get('evento'));
+        const categoria = dados.get('categoria').trim();
+        const valorTexto = dados.get('valor');
+        const valor = Number(valorTexto);
+        if (!Number.isSafeInteger(evento_id) || evento_id < 1 || !categoria ||
+          valorTexto === '' || !Number.isFinite(valor) || valor < 0) {
+          status.textContent = 'Confira o evento, a categoria e o valor.';
+          return;
+        }
+        botao.disabled = true;
+        try {
+          const consulta = await sb.from('pag_evento_valores').select('categoria').eq('evento_id', evento_id);
+          if (consulta.error) throw consulta.error;
+          if (consulta.data.some(item => item.categoria.trim().toLowerCase() === categoria.toLowerCase())) {
+            status.textContent = 'Já existe valor cadastrado para essa categoria.';
+            return;
+          }
+          const resposta = await sb.from('pag_evento_valores').insert({ evento_id, categoria, valor });
+          if (resposta.error) throw resposta.error;
+          status.textContent = 'Valor aprovado cadastrado.';
+          form.reset();
+          document.dispatchEvent(new Event('financeiro:tarifas-atualizadas'));
+        } catch (erro) {
+          status.textContent = erro.message || 'Não foi possível cadastrar o valor.';
+        } finally {
+          botao.disabled = false;
+        }
+      });
+    }
+    import('./financeiro-cobrancas.js').then(({ iniciarCobrancas }) => iniciarCobrancas(sb, () => atletas))
+      .catch(() => { $('statusCobrancaPortal').textContent = 'Não foi possível abrir o formulário de cobranças.'; });
     import('./financeiro-pagamentos.js').then(({ iniciarPagamentos }) => iniciarPagamentos(sb, () => atletas))
       .catch(() => { $('statusPagamentoPortal').textContent = 'Não foi possível abrir o módulo de pagamentos.'; });
     const ativo = a => /202[67]/.test(String(a.anuidade));
