@@ -174,6 +174,7 @@
     <div id="stats" class="text-[11px] text-gray-400 mb-3"></div>
 
     <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3">
+      <p id="atualizacaoCarteirinhas" hidden role="status" class="text-sm text-sky-300 md:col-span-full"></p>
       <input id="busca" oninput="filtrar()" placeholder="Buscar por nome, registro ou CPF" class="inp md:col-span-4">
       <select id="fAssoc" onchange="filtrar()" class="inp md:col-span-3"></select>
       <select id="fStatus" onchange="filtrar()" class="inp md:col-span-2">
@@ -1021,16 +1022,47 @@ $('backupRankingCentral').addEventListener('change',async event=>{
       await carregar();
     }
 
+    const acessoCarteirinhas = new URLSearchParams(location.search).get('modulo') === 'carteirinhas';
+    let ultimaAtualizacaoCarteirinhas = 0;
+    let carregamentosCadastro = 0;
+    if (acessoCarteirinhas) {
+      setInterval(() => {
+        if (document.hidden || carregamentosCadastro || !ultimaAtualizacaoCarteirinhas ||
+            Date.now() - ultimaAtualizacaoCarteirinhas < 120000 ||
+            document.querySelector('[id^="modal"]:not(.hidden)')) return;
+        void carregar();
+      }, 30000);
+    }
+
     async function carregar() {
+      carregamentosCadastro++;
+      try {
+        await carregarCadastro();
+      } finally {
+        carregamentosCadastro--;
+      }
+    }
+
+    async function carregarCadastro() {
       const [a, b] = await Promise.all([
         sb.from('atletas').select('*').order('nome').range(0, 4999),
         sb.from('associacoes').select('*').order('sigla')
       ]);
       if (a.error || b.error) { $('aviso').textContent = 'Erro ao carregar dados.'; return; }
       atletas = a.data; assocs = b.data;
+      if (acessoCarteirinhas) {
+        const primeiraConsulta = !ultimaAtualizacaoCarteirinhas;
+        ultimaAtualizacaoCarteirinhas = Date.now();
+        $('atualizacaoCarteirinhas').hidden = false;
+        $('atualizacaoCarteirinhas').textContent = 'Cadastro Central consultado às ' +
+          new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(ultimaAtualizacaoCarteirinhas) + '.';
+        if (primeiraConsulta) $('busca').focus();
+      }
+      const filtroAssociacao = $('fAssoc').value;
       const opts = assocs.map(s => `<option value="${s.sigla}">${s.sigla}</option>`).join('');
       $('f_associacao').innerHTML = opts;
       $('fAssoc').innerHTML = '<option value="">Todas as associações</option>' + assocs.map(s => `<option value="${s.sigla}">${s.sigla} (${atletas.filter(x => x.associacao === s.sigla).length})</option>`).join('');
+      if (assocs.some(a => a.sigla === filtroAssociacao)) $('fAssoc').value = filtroAssociacao;
       filtrar();
       atualizarBadgeFotos();
     }
