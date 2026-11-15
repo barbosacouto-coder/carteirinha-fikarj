@@ -1,3 +1,5 @@
+import categoriasBase from './ranking-categorias.js';
+
 export function conferirHistorico(backup) {
   const resultados = backup?.P?.resultados;
   if (!Array.isArray(resultados) || !resultados.length) {
@@ -19,15 +21,57 @@ export function conferirHistorico(backup) {
   return { resultados: ids.size, eventos };
 }
 
+export function pontuarHistorico(dados) {
+  conferirHistorico({ P: dados });
+  const categorias = new Map(Object.entries(categoriasBase));
+  for (const categoria of dados.catsExtra ?? []) {
+    if (!categorias.has(categoria.k)) categorias.set(categoria.k, [categoria.mod, categoria.amin]);
+  }
+  return dados.resultados.map(resultado => {
+    const categoria = categorias.get(resultado.ck);
+    if (!categoria) throw new Error('Categoria sem modalidade cadastrada: ' + resultado.ck);
+    const [modalidade, idadeMinima] = categoria;
+    const colocacao = resultado.col === 4 && dados.k4?.[resultado.ev] && modalidade === 'Kumite'
+      ? 3
+      : resultado.col;
+    const base = dados.esquemas?.[resultado.ev]?.[colocacao];
+    const peso = dados.pesos?.[resultado.ev]?.[idadeMinima != null && idadeMinima >= 18 ? 'a' : 'g'] ?? 1;
+    if (!Number.isFinite(base) || !Number.isFinite(peso)) {
+      throw new Error('Pontuação inválida no evento ' + resultado.ev + '.');
+    }
+    return { ...resultado, modalidade, colocacao, pontos: base * peso };
+  });
+}
+
 export function iniciarHistoricoRanking(sb) {
   const arquivo = document.getElementById('historicoRankingArquivo');
   const status = document.getElementById('historicoRankingStatus');
   const salvar = document.getElementById('salvarHistoricoRanking');
   const consultar = document.getElementById('consultarHistoricoRanking');
+  const busca = document.getElementById('historicoRankingAtleta');
+  const pontuacao = document.getElementById('historicoRankingPontuacao');
   let dados;
+  let pontuados = [];
+
+  const normalizar = texto => texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  function mostrarPontuacao() {
+    const termo = normalizar(busca.value.trim());
+    if (!termo) {
+      pontuacao.textContent = '';
+      return;
+    }
+    const encontrados = pontuados.filter(r => normalizar(r.atl).includes(termo));
+    pontuacao.textContent = encontrados.length
+      ? encontrados.map(r => `${r.atl} · ${r.ck} · ${r.colocacao}º · ${r.pontos} pontos`).join('\n')
+      : 'Nenhum resultado encontrado.';
+  }
+  busca.addEventListener('input', mostrarPontuacao);
 
   function mostrar(backup, mensagem) {
     const resumo = conferirHistorico(backup);
+    pontuados = pontuarHistorico(backup.P);
+    busca.disabled = false;
+    mostrarPontuacao();
     status.textContent = [
       `${resumo.resultados} resultados em ${resumo.eventos.size} eventos.`,
       mensagem,
@@ -37,6 +81,9 @@ export function iniciarHistoricoRanking(sb) {
   arquivo.addEventListener('change', async () => {
     const selecionado = arquivo.files[0];
     dados = undefined;
+    pontuados = [];
+    busca.disabled = true;
+    pontuacao.textContent = '';
     salvar.disabled = true;
     status.textContent = '';
     if (!selecionado) return;
