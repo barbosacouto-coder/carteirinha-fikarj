@@ -26,3 +26,9 @@ Migração gerada por `npx --yes supabase@3.1.0 migration new central_midias_val
 ## Limites
 
 Não aplicada à produção. Não houve publicação em redes. O teste local usa stubs de identidade e valida a permanência da proteção administrativa existente; não substitui teste com sessões reais do Portal. Validação de codec/arquivo pela Meta segue separada.
+
+## Checagens adicionais
+
+Após revisão, o teste SQL também rejeitou URLs nulas, MIME nulo e arrays de tamanhos diferentes ao salvar. Um Reel com zero ou dois vídeos pode continuar como rascunho, mas a aprovação foi corretamente bloqueada; somente um MP4 chegou ao agendamento. Worker também rejeita arrays nulos, URLs/MIME nulos e contagens inválidas (11 testes offline passaram). O teste SQL ampliado passou novamente no banco local, com rollback e remoção da database temporária confirmados.
+
+O import da Central em admin.html recebeu versão `1809fc6` para carregar a correção já commitada no próximo deploy.
