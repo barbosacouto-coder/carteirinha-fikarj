@@ -61,6 +61,7 @@
     <a href="#presidencia-cadastro" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaFiliados" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Cadastros de filiados</span><span class="block text-xs text-slate-300">Cadastro Central</span></a>
   </div>
   <nav aria-label="Acessos da Presidência" class="mt-4 flex flex-wrap gap-2 text-sm">
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-agenda">Agenda e responsabilidades</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-anuidades">Confirmar anuidades</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-ranking">Resultados e relatórios</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-arbitragem">Arbitragem</a>
@@ -69,6 +70,58 @@
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="https://barbosacouto-coder.github.io/curso-faixapreta-fikarj/admin/">Administração do curso</a>
   </nav>
 </section>
+
+<details id="presidencia-agenda" class="my-4 rounded-xl border border-slate-700 bg-slate-900 p-4 text-white">
+  <summary class="cursor-pointer font-semibold">Agenda e responsabilidades</summary>
+  <div class="mt-4 flex flex-wrap items-end gap-2">
+    <label class="block text-sm">Situação
+      <select id="agendaFiltroEstado" class="inp block">
+        <option value="ativos">Ativos</option>
+        <option value="todos">Todos</option>
+        <option value="pendente">Pendentes</option>
+        <option value="em_andamento">Em andamento</option>
+        <option value="concluida">Concluídos</option>
+        <option value="cancelada">Cancelados</option>
+      </select>
+    </label>
+    <button id="agendaNova" type="button" class="rounded-lg border border-sky-400 px-3 py-2 text-sky-200 disabled:opacity-50">Novo compromisso</button>
+    <button id="agendaAtualizar" type="button" class="rounded-lg border border-slate-600 px-3 py-2 text-slate-200 disabled:opacity-50">Atualizar agenda</button>
+  </div>
+  <p role="status" class="my-3 text-sm text-slate-300">Abra a seção para consultar os compromissos.</p>
+  <form class="hidden my-4 rounded-xl border border-slate-700 p-3">
+    <fieldset class="grid gap-3 sm:grid-cols-2">
+      <legend class="mb-2 font-semibold">Novo compromisso</legend>
+      <label class="block text-sm sm:col-span-2">Título
+        <input name="titulo" required maxlength="200" class="inp block w-full" />
+      </label>
+      <label class="block text-sm">Módulo
+        <input name="modulo" required maxlength="60" class="inp block w-full" placeholder="Ex.: Secretaria" />
+      </label>
+      <label class="block text-sm">Responsável
+        <input name="responsavel" maxlength="160" class="inp block w-full" />
+      </label>
+      <label class="block text-sm">Situação
+        <select name="status" class="inp block w-full">
+          <option value="pendente">Pendente</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="concluida">Concluída</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+      </label>
+      <label class="block text-sm">Prazo
+        <input name="prazo" type="date" class="inp block w-full" />
+      </label>
+      <label class="block text-sm sm:col-span-2">Link da origem
+        <input name="link" type="url" maxlength="2048" class="inp block w-full" placeholder="https://" />
+      </label>
+      <div class="flex flex-wrap gap-2 sm:col-span-2">
+        <button type="submit" class="rounded-lg bg-sky-700 px-3 py-2 text-white">Salvar compromisso</button>
+        <button id="agendaFecharEditor" type="button" class="rounded-lg border border-slate-600 px-3 py-2 text-slate-200">Fechar editor</button>
+      </div>
+    </fieldset>
+  </form>
+  <ul class="grid gap-2 sm:grid-cols-2"></ul>
+</details>
 
 <details id="presidencia-financeiro" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Financeiro · Lançar pagamentos</summary>
@@ -1212,6 +1265,7 @@ $('backupRankingCentral').addEventListener('change',async event=>{
     });
     $('presidenciaAbrirFotos').addEventListener('click', abrirFotosPendentes);
     let moduloPresidencia;
+    let moduloAgenda;
 
     async function iniciar() {
       const { data: s } = await sb.auth.getSession();
@@ -1229,6 +1283,8 @@ $('backupRankingCentral').addEventListener('change',async event=>{
         carregar(),
         (moduloPresidencia ??= import('./presidencia-visao.js')).then(({ iniciarVisaoPresidencia }) => iniciarVisaoPresidencia(sb))
           .catch(() => { $('presidenciaStatus').textContent = 'Indicadores indisponíveis. As áreas operacionais continuam acessíveis.'; }),
+        (moduloAgenda ??= import('./agenda-institucional.js')).then(({ iniciarAgendaInstitucional }) => iniciarAgendaInstitucional(sb))
+          .catch(() => { $('presidencia-agenda').querySelector('[role="status"]').textContent = 'Não foi possível carregar a agenda.'; }),
       ]);
     }
 
