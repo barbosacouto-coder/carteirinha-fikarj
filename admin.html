@@ -48,7 +48,29 @@
 
   <!-- PAINEL -->
   <section id="telaPainel" class="hidden max-w-6xl mx-auto">
-<details class="my-4 rounded border border-gray-700 p-4 text-white">
+<section id="visao-presidencia" aria-labelledby="tituloPresidencia" class="mb-6 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-6">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div><h1 id="tituloPresidencia" class="text-2xl font-bold text-white sm:text-3xl">Visão da Presidência</h1><p class="mt-1 text-sm text-slate-300">Pendências da Federação e acesso direto às operações.</p></div>
+    <button id="presidenciaAtualizar" type="button" class="rounded-lg border border-sky-400 px-3 py-2 text-sky-200 hover:bg-sky-900 disabled:opacity-50">Atualizar indicadores</button>
+  </div>
+  <p id="presidenciaStatus" role="status" class="my-3 text-sm text-slate-300">Aguardando consulta ao Portal.</p>
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <a href="#presidencia-secretaria" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaDocumentos" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Documentos em rascunho</span><span class="block text-xs text-slate-300">Secretaria</span></a>
+    <a href="#presidencia-financeiro" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaCobrancas" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Cobranças com saldo</span><span class="block text-xs text-slate-300"><span id="presidenciaVencidas">—</span> vencidas · cobranças registradas</span></a>
+    <button id="presidenciaAbrirFotos" type="button" class="rounded-xl border border-slate-700 bg-slate-800 p-4 text-left text-white hover:border-sky-400"><strong id="presidenciaFotos" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Fotos pendentes</span><span class="block text-xs text-slate-300">Revisar fotos de carteirinha</span></button>
+    <a href="#presidencia-cadastro" class="block rounded-xl border border-slate-700 bg-slate-800 p-4 text-white hover:border-sky-400"><strong id="presidenciaFiliados" class="block text-3xl text-sky-200">—</strong><span class="font-semibold">Cadastros de filiados</span><span class="block text-xs text-slate-300">Cadastro Central</span></a>
+  </div>
+  <nav aria-label="Acessos da Presidência" class="mt-4 flex flex-wrap gap-2 text-sm">
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-anuidades">Confirmar anuidades</a>
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-ranking">Resultados e relatórios</a>
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-arbitragem">Arbitragem</a>
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="?modulo=carteirinhas">Carteirinhas</a>
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="?modulo=aniversariantes">Aniversariantes</a>
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="https://barbosacouto-coder.github.io/curso-faixapreta-fikarj/admin/">Administração do curso</a>
+  </nav>
+</section>
+
+<details id="presidencia-financeiro" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Financeiro · Lançar pagamentos</summary>
   <details class="my-3 rounded border border-gray-700 p-3">
     <summary>Cadastrar evento ou curso no financeiro</summary>
@@ -103,7 +125,7 @@
     <p id="statusPagamentoPortal" role="status" class="whitespace-pre-line"></p>
   </form>
 </details>
-<details class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4 text-white">
+<details id="presidencia-anuidades" class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4 text-white">
   <summary>Financeiro · Confirmação de anuidades pela Presidência</summary>
   <label class="block mt-3">Ano das anuidades <input id="anoConfirmacaoAnuidades" type="number" value="2027" class="rounded bg-gray-800 p-2"></label>
   <button type="button" id="consultarAnuidadesPresidencia" class="my-3 rounded bg-gray-700 p-2">Conferir pagamentos</button>
@@ -111,7 +133,7 @@
   <ol id="listaAnuidadesPresidencia" class="max-h-64 overflow-auto"></ol>
   <button type="button" id="confirmarAnuidadesPresidencia" hidden class="mt-3 rounded bg-sky-700 p-2">Confirmar pela Presidência</button>
 </details>
-<details class="my-4 rounded border border-gray-700 p-4 text-white">
+<details id="presidencia-ranking" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Resultados e ranking · Conferir histórico</summary>
   <p class="my-2">Selecione um backup do Painel Integrado para conferir a estrutura e as contagens antes da migração.</p>
   <label>Backup do Painel Integrado <input type="file" id="historicoRankingArquivo" accept=".json,application/json"></label>
@@ -151,7 +173,7 @@
 <label>Backup do ranking <input type="file" id="backupRankingCentral" accept=".json"></label>
 <p id="statusBackupRankingCentral" role="status"></p>
 <button id="baixarBackupRankingCentral" type="button" hidden>Baixar cópia atualizada</button></details>
-<details class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Arbitragem · Novos lançamentos</summary>
+<details id="presidencia-arbitragem" class="my-4 rounded border border-gray-700 p-4 text-white"><summary>Arbitragem · Novos lançamentos</summary>
 <form id="formLancarArbitragem" class="mt-3 grid gap-2">
 <label>Tipo <select name="tipo" class="bg-gray-800"><option>Escala</option><option>Avaliação</option><option>Pagamento</option></select></label>
 <label>Evento <input name="evento" required maxlength="180" class="rounded bg-gray-800 p-2"></label>
@@ -170,7 +192,7 @@
 <pre id="resultadoArbitragemTeste" class="whitespace-pre-wrap" role="status"></pre></details>
     <button type="button" onclick="exportarCadastroRanking()" class="my-2 rounded bg-gray-800 px-3 py-2 text-white">Baixar cadastro para o ranking privado</button>
     <p id="statusCadastroRanking" role="status"></p>
-    <details class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
+    <details id="presidencia-secretaria" class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
       <summary class="cursor-pointer font-bold text-white">Secretaria · Protocolo de documentos</summary>
       <form id="formProtocolo" class="mt-4 grid gap-3 text-gray-100">
         <label>Tipo de documento
@@ -232,7 +254,7 @@
       </form>
     </details>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <h1 class="text-white font-cinzel font-extrabold text-lg">Cadastro de filiados</h1>
+      <h2 id="presidencia-cadastro" tabindex="-1" class="text-white font-cinzel font-extrabold text-lg">Cadastro de filiados</h2>
       <div class="flex gap-2 text-xs">
         <button onclick="novo()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold px-3 py-2 rounded-lg">+ Novo atleta</button>
         <label class="cursor-pointer bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-semibold px-3 py-2 rounded-lg">Importar planilha<input type="file" accept=".xlsx,.xls" class="hidden" onchange="lerPlanilha(event)"></label>
@@ -1173,6 +1195,24 @@ $('backupRankingCentral').addEventListener('change',async event=>{
 
     async function sair() { await sb.auth.signOut(); location.reload(); }
 
+    function abrirSecaoPresidencia() {
+      if ($('telaPainel').classList.contains('hidden')) return;
+      const id = location.hash.slice(1);
+      if (!id.startsWith('presidencia-')) return;
+      const alvo = $(id);
+      if (!alvo) return;
+      if (alvo instanceof HTMLDetailsElement) alvo.open = true;
+      alvo.scrollIntoView({ block: 'start' });
+      (alvo.querySelector('summary') || alvo).focus({ preventScroll: true });
+    }
+    window.addEventListener('hashchange', abrirSecaoPresidencia);
+    $('visao-presidencia').addEventListener('click', event => {
+      const link = event.target.closest('a[href^="#presidencia-"]');
+      if (link?.hash === location.hash) abrirSecaoPresidencia();
+    });
+    $('presidenciaAbrirFotos').addEventListener('click', abrirFotosPendentes);
+    let moduloPresidencia;
+
     async function iniciar() {
       const { data: s } = await sb.auth.getSession();
       if (!s.session) return;
@@ -1184,7 +1224,12 @@ $('backupRankingCentral').addEventListener('change',async event=>{
       }
       $('telaLogin').classList.add('hidden');
       $('telaPainel').classList.remove('hidden');
-      await carregar();
+      abrirSecaoPresidencia();
+      await Promise.all([
+        carregar(),
+        (moduloPresidencia ??= import('./presidencia-visao.js')).then(({ iniciarVisaoPresidencia }) => iniciarVisaoPresidencia(sb))
+          .catch(() => { $('presidenciaStatus').textContent = 'Indicadores indisponíveis. As áreas operacionais continuam acessíveis.'; }),
+      ]);
     }
 
     const moduloCadastro = new URLSearchParams(location.search).get('modulo');
