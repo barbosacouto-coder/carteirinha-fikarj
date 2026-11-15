@@ -174,6 +174,12 @@
     <div id="stats" class="text-[11px] text-gray-400 mb-3"></div>
 
     <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3">
+      <section id="painelAniversariantesPortal" hidden class="md:col-span-full rounded border border-gray-700 p-4">
+        <h2 class="font-bold text-lg">Aniversariantes</h2>
+        <label class="block my-2">Data da consulta <input id="dataAniversariantesPortal" type="date" class="inp"></label>
+        <p id="totalAniversariantesPortal" role="status"></p>
+        <ul id="listaAniversariantesPortal" class="mt-2 space-y-1"></ul>
+      </section>
       <p id="atualizacaoCarteirinhas" hidden role="status" class="text-sm text-sky-300 md:col-span-full"></p>
       <input id="busca" oninput="filtrar()" placeholder="Buscar por nome, registro ou CPF" class="inp md:col-span-4">
       <select id="fAssoc" onchange="filtrar()" class="inp md:col-span-3"></select>
@@ -1022,10 +1028,27 @@ $('backupRankingCentral').addEventListener('change',async event=>{
       await carregar();
     }
 
-    const acessoCarteirinhas = new URLSearchParams(location.search).get('modulo') === 'carteirinhas';
+    const moduloCadastro = new URLSearchParams(location.search).get('modulo');
+    const acessoCarteirinhas = moduloCadastro === 'carteirinhas';
+    const acessoAniversariantes = moduloCadastro === 'aniversariantes';
+    function mostrarAniversariantesPortal() {
+      const dia = $('dataAniversariantesPortal').value.slice(5);
+      const lista = dia ? atletas.filter(a => a.nascimento?.slice(5) === dia).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')) : [];
+      $('totalAniversariantesPortal').textContent = lista.length + ' aniversariante(s) no Cadastro Central.';
+      $('listaAniversariantesPortal').replaceChildren(...lista.map(a => {
+        const linha = document.createElement('li');
+        linha.textContent = [a.nome, a.associacao, a.graduacao].filter(Boolean).join(' · ');
+        return linha;
+      }));
+    }
+    if (acessoAniversariantes) {
+      const data = $('dataAniversariantesPortal');
+      data.value = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+      data.addEventListener('change', mostrarAniversariantesPortal);
+    }
     let ultimaAtualizacaoCarteirinhas = 0;
     let carregamentosCadastro = 0;
-    if (acessoCarteirinhas) {
+    if (acessoCarteirinhas || acessoAniversariantes) {
       setInterval(() => {
         if (document.hidden || carregamentosCadastro || !ultimaAtualizacaoCarteirinhas ||
             Date.now() - ultimaAtualizacaoCarteirinhas < 120000 ||
@@ -1050,13 +1073,18 @@ $('backupRankingCentral').addEventListener('change',async event=>{
       ]);
       if (a.error || b.error) { $('aviso').textContent = 'Erro ao carregar dados.'; return; }
       atletas = a.data; assocs = b.data;
-      if (acessoCarteirinhas) {
+      if (acessoCarteirinhas || acessoAniversariantes) {
         const primeiraConsulta = !ultimaAtualizacaoCarteirinhas;
         ultimaAtualizacaoCarteirinhas = Date.now();
         $('atualizacaoCarteirinhas').hidden = false;
         $('atualizacaoCarteirinhas').textContent = 'Cadastro Central consultado às ' +
           new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(ultimaAtualizacaoCarteirinhas) + '.';
-        if (primeiraConsulta) $('busca').focus();
+        if (primeiraConsulta && acessoCarteirinhas) $('busca').focus();
+        if (acessoAniversariantes) {
+          $('painelAniversariantesPortal').hidden = false;
+          mostrarAniversariantesPortal();
+          if (primeiraConsulta) $('dataAniversariantesPortal').focus();
+        }
       }
       const filtroAssociacao = $('fAssoc').value;
       const opts = assocs.map(s => `<option value="${s.sigla}">${s.sigla}</option>`).join('');
