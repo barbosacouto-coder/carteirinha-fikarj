@@ -461,7 +461,7 @@
   </script>
   <script>
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    import('./ranking-historico.js').then(({ iniciarHistoricoRanking }) => iniciarHistoricoRanking(sb))
+    import('./ranking-historico.js?v=2').then(({ iniciarHistoricoRanking }) => iniciarHistoricoRanking(sb))
       .catch(() => { document.getElementById('historicoRankingStatus').textContent = 'Não foi possível abrir o módulo de histórico.'; });
     let atletas = [], assocs = [], editando = null, importPend = null;
     const $ = id => document.getElementById(id);
