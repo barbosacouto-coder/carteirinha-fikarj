@@ -786,7 +786,7 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       const teste = $('modoTesteEmissaoDiploma').checked;
       $('rotuloPdfEmissao').textContent = teste ? 'PDF da prévia de teste' : 'PDF final assinado';
       $('rotuloConfereEmissao').textContent = teste ? 'Conferi o protocolo de teste e o nome do atleta no PDF.' : 'Conferi o protocolo oficial, o nome do atleta e as assinaturas autorizadas no PDF.';
-      $('botaoRegistrarEmissao').textContent = teste ? 'Registrar emissão de teste' : 'Registrar emissão oficial';
+      $('botaoRegistrarEmissao').textContent = teste ? 'Registrar emissão de teste' : 'Confirmar emissão pela Presidência';
       $('confereEmissaoDiploma').checked = false;
       $('pdfEmissaoDiploma').value = '';
       $('numeroEmissaoDiploma').value = '';
@@ -816,7 +816,7 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
         const p_pdf_sha256 = Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
         const {data,error} = await sb.rpc(modoTeste ? 'registrar_emissao_diploma_teste_fikarj' : 'registrar_emissao_diploma_fikarj',{p_ano:Number(match[2]),p_numero:Number(match[1]),p_pdf_sha256});
         if (error || !data) throw Error(error?.message || 'O Portal não confirmou o registro.');
-        status.textContent = (modoTeste ? 'Emissão de teste registrada para ' : 'Emissão oficial registrada para ') + numeroCompleto + '.';
+        status.textContent = (modoTeste ? 'Emissão de teste registrada para ' : 'Emissão confirmada pela Presidência para ') + numeroCompleto + '.';
         form.reset();
         atualizarModoEmissaoDiploma();
       } catch (erro) { status.textContent = 'Emissão não confirmada. ' + erro.message; }
