@@ -67,6 +67,23 @@
   <p id="historicoRankingStatus" role="status" class="my-2 whitespace-pre-line"></p>
   <label>Conferir pontos por atleta <input id="historicoRankingAtleta" disabled class="rounded bg-gray-800 px-2 py-1"></label>
   <p id="historicoRankingPontuacao" role="status" class="my-2 whitespace-pre-line"></p>
+  <details id="centralRelatoriosRanking" hidden class="my-4 rounded border border-gray-700 p-3">
+    <summary class="cursor-pointer font-semibold">Central de Relatórios</summary>
+    <div class="my-3 flex flex-wrap gap-3">
+      <label>Evento <select id="relatorioRankingEvento" class="inp"></select></label>
+      <label>Agrupar por <select id="relatorioRankingGrupo" class="inp">
+        <option value="evento">Evento</option><option value="categoria">Categoria</option><option value="associacao">Associação</option>
+      </select></label>
+    </div>
+    <button id="baixarRelatorioRanking" type="button" class="mb-2 rounded bg-gray-700 px-3 py-2">Baixar CSV</button>
+    <p id="relatorioRankingTotal" role="status" class="mb-2 text-sm"></p>
+    <div class="max-h-96 overflow-auto">
+      <table class="w-full text-left text-sm">
+        <thead><tr><th>Grupo</th><th>Resultados</th><th>Ouros</th><th>Pratas</th><th>Bronzes</th><th>4º</th><th>Pontos</th></tr></thead>
+        <tbody id="relatorioRankingLinhas"></tbody>
+      </table>
+    </div>
+  </details>
   <form id="lancarResultadoHistorico" hidden class="my-3 space-y-2">
     <label>Categoria <select name="categoria" required class="bg-gray-800"></select></label>
     <label>Posição <select name="colocacao" class="bg-gray-800"><option value="1">1º</option><option value="2">2º</option><option value="3">3º</option><option value="4">4º / segundo bronze, conforme a regra</option></select></label>
@@ -477,7 +494,7 @@
   </script>
   <script>
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    import('./ranking-historico.js?v=4').then(({ iniciarHistoricoRanking }) => iniciarHistoricoRanking(sb, abrirPreviaHistorico, () => atletas))
+    import('./ranking-historico.js?v=5').then(({ iniciarHistoricoRanking }) => iniciarHistoricoRanking(sb, abrirPreviaHistorico, () => atletas))
       .catch(() => { document.getElementById('historicoRankingStatus').textContent = 'Não foi possível abrir o módulo de histórico.'; });
     let atletas = [], assocs = [], editando = null, importPend = null;
     const $ = id => document.getElementById(id);

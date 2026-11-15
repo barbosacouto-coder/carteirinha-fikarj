@@ -1,3 +1,4 @@
+import { resumirRelatorio } from './ranking-relatorios.js';
 import categoriasBase, { eventos } from './ranking-categorias.js?v=2';
 
 export function conferirHistorico(backup) {
@@ -50,6 +51,45 @@ export function iniciarHistoricoRanking(sb, revisarPublicacao, obterAtletas) {
   const consultar = document.getElementById('consultarHistoricoRanking');
   const busca = document.getElementById('historicoRankingAtleta');
   const pontuacao = document.getElementById('historicoRankingPontuacao');
+  const central = document.getElementById('centralRelatoriosRanking');
+  const eventoRelatorio = document.getElementById('relatorioRankingEvento');
+  const grupoRelatorio = document.getElementById('relatorioRankingGrupo');
+  const totalRelatorio = document.getElementById('relatorioRankingTotal');
+  const linhasRelatorio = document.getElementById('relatorioRankingLinhas');
+  function atualizarRelatorio() {
+    const grupos = resumirRelatorio(pontuados, grupoRelatorio.value, eventoRelatorio.value || undefined);
+    const total = grupos.reduce((soma, grupo) => soma + grupo.resultados, 0);
+    totalRelatorio.textContent = total + ' resultado(s) em ' + grupos.length + ' grupo(s).';
+    linhasRelatorio.replaceChildren(...grupos.map(grupo => {
+      const linha = document.createElement('tr');
+      linha.className = 'border-t border-gray-700';
+      const titulo = grupoRelatorio.value === 'evento' ? eventos[grupo.chave]?.curto ?? grupo.chave : grupo.chave;
+      const celulas = [titulo, grupo.resultados, grupo.ouro, grupo.prata, grupo.bronze, grupo.quarto, grupo.pontos];
+      for (const valor of celulas) {
+        const celula = document.createElement('td');
+        celula.className = 'p-2';
+        celula.textContent = valor;
+        linha.append(celula);
+      }
+      return linha;
+    }));
+  }
+  document.getElementById('baixarRelatorioRanking').addEventListener('click', () => {
+    const tabela = linhasRelatorio.closest('table');
+    const texto = Array.from(tabela.rows, linha => Array.from(linha.cells, celula => {
+      const valor = celula.textContent;
+      const seguro = /^[=+@-]/.test(valor) ? "'" + valor : valor;
+      return '"' + seguro.replaceAll('"', '""') + '"';
+    }).join(';')).join('\r\n');
+    const endereco = URL.createObjectURL(new Blob(['\uFEFF', texto], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = endereco;
+    link.download = 'Relatorio_FIKARJ_' + grupoRelatorio.value + '.csv';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(endereco), 1000);
+  });
+  eventoRelatorio.addEventListener('change', atualizarRelatorio);
+  grupoRelatorio.addEventListener('change', atualizarRelatorio);
   const formulario = document.getElementById('lancarResultadoHistorico');
   const prever = document.getElementById('preverPublicacaoHistorico');
   let dados;
@@ -114,6 +154,12 @@ export function iniciarHistoricoRanking(sb, revisarPublicacao, obterAtletas) {
   function mostrar(backup, mensagem) {
     const resumo = conferirHistorico(backup);
     pontuados = pontuarHistorico(backup.P);
+    const eventoAnterior = eventoRelatorio.value;
+    eventoRelatorio.replaceChildren(new Option('Todos os eventos', ''), ...Array.from(resumo.eventos.keys(), codigo =>
+      new Option(eventos[codigo]?.curto ?? codigo, codigo)));
+    if (resumo.eventos.has(eventoAnterior)) eventoRelatorio.value = eventoAnterior;
+    atualizarRelatorio();
+    central.hidden = false;
     busca.disabled = false;
     formulario.hidden = false;
     mostrarPontuacao();
@@ -129,6 +175,7 @@ export function iniciarHistoricoRanking(sb, revisarPublicacao, obterAtletas) {
     formulario.hidden = true;
     prever.disabled = true;
     pontuados = [];
+    central.hidden = true;
     busca.disabled = true;
     pontuacao.textContent = '';
     salvar.disabled = true;

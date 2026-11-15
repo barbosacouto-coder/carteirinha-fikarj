@@ -2,7 +2,7 @@ import { eventos } from './ranking-categorias.js?v=2';
 
 export const chaveNome = texto => texto.normalize('NFD').replace(/\p{M}/gu, '').trim().replace(/\s+/g, ' ').toUpperCase();
 
-function chaveAssociacao(sigla) {
+export function chaveAssociacao(sigla) {
   const chave = String(sigla ?? '').trim().toUpperCase();
   return chave === 'AKATZUKI' ? 'AKATSUKI' : chave;
 }
