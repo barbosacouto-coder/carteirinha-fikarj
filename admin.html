@@ -784,8 +784,10 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
 
     function atualizarModoEmissaoDiploma() {
       const teste = $('modoTesteEmissaoDiploma').checked;
+      $('pdfEmissaoDiploma').closest('label').hidden = !teste;
+      $('pdfEmissaoDiploma').required = teste;
       $('rotuloPdfEmissao').textContent = teste ? 'PDF da prévia de teste' : 'PDF final assinado';
-      $('rotuloConfereEmissao').textContent = teste ? 'Conferi o protocolo de teste e o nome do atleta no PDF.' : 'Conferi o protocolo oficial, o nome do atleta e as assinaturas autorizadas no PDF.';
+      $('rotuloConfereEmissao').textContent = teste ? 'Conferi o protocolo de teste e o nome do atleta no PDF.' : 'Conferi o diploma e confirmo a emissão oficial pela Presidência.';
       $('botaoRegistrarEmissao').textContent = teste ? 'Registrar emissão de teste' : 'Confirmar emissão pela Presidência';
       $('confereEmissaoDiploma').checked = false;
       $('pdfEmissaoDiploma').value = '';
@@ -800,20 +802,23 @@ function gerarPreviaCertificado(nome, assunto, protocolo, JsPDF) {
       const status = $('statusEmissaoDiploma');
       const numeroCompleto = $('numeroEmissaoDiploma').value.trim();
       const match = /^([0-9]{1,15})\/([0-9]{4})$/.exec(numeroCompleto);
+      const modoTeste = $('modoTesteEmissaoDiploma').checked;
       const arquivo = $('pdfEmissaoDiploma').files[0];
-      if (!match || Number(match[1]) < 1 || !arquivo || arquivo.size > 20 * 1024 * 1024 || !$('confereEmissaoDiploma').checked) {
-        status.textContent = 'Informe o protocolo e confirme a conferência do PDF de até 20 MB.';
+      if (!match || Number(match[1]) < 1 || !$('confereEmissaoDiploma').checked || (modoTeste && (!arquivo || arquivo.size > 20 * 1024 * 1024))) {
+        status.textContent = modoTeste ? 'Informe o protocolo e confira o PDF de teste de até 20 MB.' : 'Informe o protocolo oficial e marque a confirmação da Presidência.';
         return;
       }
-      const modoTeste = $('modoTesteEmissaoDiploma').checked;
       if (!confirm('Registrar a emissão ' + (modoTeste ? 'de teste' : 'oficial') + ' do diploma ' + numeroCompleto + '?')) return;
       botao.disabled = true;
       status.textContent = 'Registrando emissão…';
       try {
-        const bytes = await arquivo.arrayBuffer();
-        if (new TextDecoder().decode(bytes.slice(0,5)) !== '%PDF-') throw Error('Selecione um arquivo PDF válido.');
-        const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
-        const p_pdf_sha256 = Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
+        let p_pdf_sha256 = null;
+        if (modoTeste) {
+          const bytes = await arquivo.arrayBuffer();
+          if (new TextDecoder().decode(bytes.slice(0,5)) !== '%PDF-') throw Error('Selecione um arquivo PDF válido.');
+          const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+          p_pdf_sha256 = Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
+        }
         const {data,error} = await sb.rpc(modoTeste ? 'registrar_emissao_diploma_teste_fikarj' : 'registrar_emissao_diploma_fikarj',{p_ano:Number(match[2]),p_numero:Number(match[1]),p_pdf_sha256});
         if (error || !data) throw Error(error?.message || 'O Portal não confirmou o registro.');
         status.textContent = (modoTeste ? 'Emissão de teste registrada para ' : 'Emissão confirmada pela Presidência para ') + numeroCompleto + '.';
