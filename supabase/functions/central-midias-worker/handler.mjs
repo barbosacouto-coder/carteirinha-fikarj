@@ -40,6 +40,10 @@ export function createHandler(env, fetcher = fetch) {
     if (input.operation === 'claim' && Object.keys(input).length === 1) {
       rpc = 'central_midias_worker_claim';
       args = { p_limite: 1 };
+    } else if (input.operation === 'claim_target' && Object.keys(input).length === 2 &&
+               typeof input.destination_id === 'string' && uuid.test(input.destination_id)) {
+      rpc = 'central_midias_worker_claim_target';
+      args = { p_destino_id: input.destination_id };
     } else if (input.operation === 'finalize') {
       const allowed = new Set(['operation', 'destination_id', 'lease_token', 'result', 'external_id', 'error']);
       if (Object.keys(input).some(k => !allowed.has(k)) ||

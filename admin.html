@@ -1330,7 +1330,7 @@ $('backupRankingCentral').addEventListener('change',async event=>{
         (moduloAgenda ??= import('./agenda-institucional.js')).then(({ iniciarAgendaInstitucional }) => iniciarAgendaInstitucional(sb))
           .catch(() => { $('presidencia-agenda').querySelector('[role="status"]').textContent = 'Não foi possível carregar a agenda.'; }),
         iniciarVisoesFinanceiras(),
-        Promise.all([import('./central-midias.js?v=cancelamento-inline-20261115'), import('./central-midias-arquivos.js')])
+        Promise.all([import('./central-midias.js?v=publicar-agora'), import('./central-midias-arquivos.js')])
           .then(([{ iniciarCentralMidias }, { iniciarArquivosMidias }]) => {
             iniciarCentralMidias(sb);
             iniciarArquivosMidias();

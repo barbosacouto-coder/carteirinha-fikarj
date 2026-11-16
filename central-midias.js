@@ -211,6 +211,55 @@ export function iniciarCentralMidias(sb) {
           transicionar(item, 'agendar', 'Agendamento registrado.');
         }
       }));
+      if (['aprovado', 'parcial'].includes(item.status)) {
+        for (const info of item.destinos ?? []) {
+          if (info.status !== 'pendente' || !canais[info.destino]) continue;
+          const canal = canais[info.destino];
+          li.append(botao('Publicar agora · ' + canal, () => {
+            if (li.querySelector('[data-confirmar-publicacao]')) return;
+            const confirmar = document.createElement('div');
+            confirmar.dataset.confirmarPublicacao = '';
+            confirmar.setAttribute('role', 'group');
+            confirmar.setAttribute('aria-label', 'Confirmar publicação');
+            texto(confirmar, 'Publicar “' + item.tema + '” agora em ' + canal + '?');
+            const enviar = botao('Confirmar publicação', () => executar(async () => {
+              if (enviar.disabled) return status.textContent;
+              enviar.disabled = true;
+              const resposta = await sb.functions.invoke('central-midias-publicar-agora', {
+                body: { midia_id: item.id, versao: item.versao, destino: info.destino },
+              }).catch(() => null);
+              const contexto = resposta?.error?.context;
+              const detalhe = typeof contexto?.json === 'function'
+                ? await contexto.json().catch(() => null)
+                : null;
+              const reservaLiberada = detalhe?.error === 'disparo_rejeitado_reserva_liberada' &&
+                detalhe.retryable === true;
+              let atualizada = false;
+              try {
+                await atualizar();
+                atualizada = true;
+              } catch {
+                // Mantenha a confirmação bloqueada enquanto o estado do envio não é conhecido.
+              }
+              if (!resposta || resposta.error || resposta.data?.accepted !== true) {
+                if (reservaLiberada) {
+                  enviar.disabled = false;
+                  return 'O GitHub recusou o disparo e a reserva foi liberada. Você pode tentar novamente.';
+                }
+                if (detalhe?.error === 'solicitacao_em_andamento') {
+                  return 'Já existe um envio em andamento. Acompanhe o status no cartão da pauta.';
+                }
+                return 'Envio não confirmado. Confira o status da pauta antes de tentar novamente.';
+              }
+              if (!atualizada) return 'Envio aceito. Atualize a lista para acompanhar o resultado.';
+              return 'Envio aceito. Acompanhe o status e o recibo no cartão da pauta.';
+            }));
+            confirmar.append(enviar, botao('Voltar', () => confirmar.remove()));
+            li.append(confirmar);
+            enviar.focus();
+          }));
+        }
+      }
       if (['rascunho', 'planejado', 'aprovado', 'agendado'].includes(item.status)) li.append(botao('Cancelar item', () => {
         if (li.querySelector('[data-confirmar-cancelamento]')) return;
         const confirmar = document.createElement('div');
