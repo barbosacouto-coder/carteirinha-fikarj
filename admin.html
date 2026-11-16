@@ -70,6 +70,7 @@
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-agenda">Agenda e responsabilidades</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-anuidades">Confirmar anuidades</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-midias">Central de Mídias</a>
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-segundo-cerebro">Segundo Cérebro</a>
     <button type="button" onclick="abrirRanking()" class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800">Ver ranking publicado</button>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-ranking">Resultados e relatórios</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-arbitragem">Arbitragem</a>
@@ -129,6 +130,44 @@
     </fieldset>
   </form>
   <ul class="grid gap-2 sm:grid-cols-2"></ul>
+</details>
+
+<details id="presidencia-segundo-cerebro" class="my-4 rounded-xl border border-slate-700 bg-slate-900 p-4 text-white">
+  <summary class="cursor-pointer text-lg font-semibold">Catálogo protegido do Segundo Cérebro</summary>
+  <div id="segundoCerebro" class="mt-4 space-y-4">
+    <p class="text-sm text-slate-300">Consulte o catálogo autorizado da Federação. Esta página não expõe nem sincroniza a pasta local; cada arquivo aberto aqui é uma cópia revisada, enviada individualmente por um administrador e protegida por link temporário.</p>
+    <form id="segundoCerebroBusca" class="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem_auto]">
+      <label>
+        <span class="lbl">Buscar</span>
+        <input id="segundoCerebroTermo" class="inp" type="search" autocomplete="off" placeholder="Título, assunto ou tipo de documento">
+      </label>
+      <label>
+        <span class="lbl">Categoria</span>
+        <select id="segundoCerebroCategoria" class="inp">
+          <option value="">Todas as categorias</option>
+        </select>
+      </label>
+      <button class="self-end rounded-lg bg-sky-600 px-4 py-2 font-semibold hover:bg-sky-500" type="submit">Pesquisar</button>
+    </form>
+    <p id="segundoCerebroStatus" role="status" class="text-sm text-slate-300">Aguardando consulta.</p>
+    <div id="segundoCerebroResultados" class="grid gap-3 md:grid-cols-2"></div>
+    <button id="segundoCerebroMais" class="hidden rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-slate-800" type="button">Carregar mais</button>
+    <details class="rounded-lg border border-slate-700 bg-slate-950/50 p-3">
+      <summary class="cursor-pointer font-semibold">Enviar cópia de documento revisado</summary>
+      <form id="segundoCerebroUpload" class="mt-3 grid gap-3 md:grid-cols-2">
+        <label><span class="lbl">Título</span><input id="segundoCerebroTitulo" class="inp" required maxlength="180"></label>
+        <label><span class="lbl">Categoria</span><input id="segundoCerebroNovaCategoria" class="inp" required maxlength="80" placeholder="Manual, Ofício, Projeto..."></label>
+        <label><span class="lbl">Arquivo autorizado</span><input id="segundoCerebroArquivo" class="inp" type="file" required accept=".pdf,.docx,.xlsx,.html,.htm,.md,.txt,.jpg,.jpeg,.png"></label>
+        <label><span class="lbl">Data do documento</span><input id="segundoCerebroData" class="inp" type="date"></label>
+        <label class="md:col-span-2"><span class="lbl">Resumo</span><textarea id="segundoCerebroResumo" class="inp" rows="3" maxlength="600"></textarea></label>
+        <label class="md:col-span-2 flex items-start gap-2 text-sm text-amber-200">
+          <input id="segundoCerebroConfirmacao" class="mt-1" type="checkbox" required>
+          <span>Conferi a versão, a finalidade, a autorização de acesso e a ausência de senhas, tokens, backups e dados pessoais desnecessários.</span>
+        </label>
+        <button id="segundoCerebroEnviar" class="justify-self-start rounded-lg bg-sky-600 px-4 py-2 font-semibold hover:bg-sky-500 disabled:opacity-50" type="submit">Enviar cópia ao acervo protegido</button>
+      </form>
+    </details>
+  </div>
 </details>
 
 <details id="presidencia-midias" class="my-4 rounded border border-gray-700 p-4 text-white">
@@ -1291,6 +1330,7 @@ $('backupRankingCentral').addEventListener('change',async event=>{
     $('presidenciaAbrirFotos').addEventListener('click', abrirFotosPendentes);
     let moduloPresidencia;
     let moduloAgenda;
+    let moduloSegundoCerebro;
 
     function iniciarVisoesFinanceiras(podeOperar = true) {
       return Promise.all([
@@ -1329,6 +1369,8 @@ $('backupRankingCentral').addEventListener('change',async event=>{
           .catch(() => { $('presidenciaStatus').textContent = 'Indicadores indisponíveis. As áreas operacionais continuam acessíveis.'; }),
         (moduloAgenda ??= import('./agenda-institucional.js')).then(({ iniciarAgendaInstitucional }) => iniciarAgendaInstitucional(sb))
           .catch(() => { $('presidencia-agenda').querySelector('[role="status"]').textContent = 'Não foi possível carregar a agenda.'; }),
+        (moduloSegundoCerebro ??= import('./segundo-cerebro.js?v=1')).then(({ iniciarSegundoCerebro }) => iniciarSegundoCerebro(sb))
+          .catch(() => { $('segundoCerebroStatus').textContent = 'Não foi possível carregar o Segundo Cérebro.'; }),
         iniciarVisoesFinanceiras(),
         Promise.all([import('./central-midias.js?v=publicar-agora'), import('./central-midias-arquivos.js')])
           .then(([{ iniciarCentralMidias }, { iniciarArquivosMidias }]) => {
