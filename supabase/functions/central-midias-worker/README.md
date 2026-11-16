@@ -32,8 +32,8 @@ POST JSON, header `x-fikarj-worker-key`, sem CORS para clientes web.
 6. Configurar variável GitHub `CENTRAL_MIDIAS_BROKER_URL` com a URL HTTPS da função
    no projeto institucional. O worker rejeita outros caminhos/hosts e configuração parcial.
 7. Repetir validação autenticada após implantar em ambiente de homologação.
-   HTTP local já passou no Edge Runtime real com fila simulada; integração Edge →
-   PostgREST real continua pendente. As RPCs foram testadas separadamente no PostgreSQL local.
+   HTTP local já passou no Edge Runtime real tanto com fila simulada quanto com
+   PostgREST e PostgreSQL reais em banco descartável. Homologação hospedada ainda não feita.
 8. Manter `CENTRAL_MIDIAS_ALLOW_PUBLICATION` desligada até revisão de fila e pauta
    institucional aprovada. Não publicar as fixtures.
 
@@ -52,6 +52,13 @@ restrito. Uma falha de finalização após publicação exige reconciliação, n
   token incorreto 401, claim/finalize autenticados, segundo claim vazio, publicação
   simulada uma única vez. O adaptador de teste bloqueia todas as chamadas externas.
   Container descartável removido ao terminar. Banco/Meta no teste HTTP são simulados.
+- Segunda rodada HTTP usou `postgrest/postgrest:v16.5`, digest
+  `sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc`,
+  conectado ao PostgreSQL 17.11 local. Worker → Edge → REST → SQL completou claim/finalize;
+  segundo claim vazio. SQL confirmou ID sintético e uma entrada de cada ação
+  salvar/aprovar/agendar/encaminhar/finalizar. Apenas Meta foi simulada nessa rodada.
+  Tokens e login eram fictícios locais. Banco, papel e arquivos de credenciais
+  temporários removidos; containers de teste ausentes após limpeza.
 
 O modo direto antigo do worker permanece para compatibilidade, mas o workflow usa
 somente variáveis/segredo do broker. A publicação automática permanece desativada.
