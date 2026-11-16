@@ -31,8 +31,9 @@ POST JSON, header `x-fikarj-worker-key`, sem CORS para clientes web.
    obrigatória do header no handler. Confirmar opção da CLI atual antes de executar.
 6. Configurar variável GitHub `CENTRAL_MIDIAS_BROKER_URL` com a URL HTTPS da função
    no projeto institucional. O worker rejeita outros caminhos/hosts e configuração parcial.
-7. Validar HTTP 401 para token errado e teste autenticado em ambiente isolado.
-   Ainda não houve esse teste de transporte/Edge Runtime real; os testes Node usam fetch simulado.
+7. Repetir validação autenticada após implantar em ambiente de homologação.
+   HTTP local já passou no Edge Runtime real com fila simulada; integração Edge →
+   PostgREST real continua pendente. As RPCs foram testadas separadamente no PostgreSQL local.
 8. Manter `CENTRAL_MIDIAS_ALLOW_PUBLICATION` desligada até revisão de fila e pauta
    institucional aprovada. Não publicar as fixtures.
 
@@ -46,6 +47,11 @@ restrito. Uma falha de finalização após publicação exige reconciliação, n
 - Teste SQL local revertido: grants, lease errado, finalização duplicada,
   destino distinto, expiração em resultado incerto e preservação do recibo.
 - 18 testes Python do publicador/contrato, incluindo modo broker sem chave de banco.
+- HTTP local em `supabase/edge-runtime:v1.77.4`, digest
+  `sha256:ad45164b7548bf5820ed7be714789c17ac2865edce79a09cfb4c3756c3d365a8`:
+  token incorreto 401, claim/finalize autenticados, segundo claim vazio, publicação
+  simulada uma única vez. O adaptador de teste bloqueia todas as chamadas externas.
+  Container descartável removido ao terminar. Banco/Meta no teste HTTP são simulados.
 
 O modo direto antigo do worker permanece para compatibilidade, mas o workflow usa
 somente variáveis/segredo do broker. A publicação automática permanece desativada.
