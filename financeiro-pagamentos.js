@@ -85,6 +85,9 @@ export function iniciarPagamentos(sb, obterAtletas) {
         }, descricao: item.descricao || 'Pagamento de ' + rotulo };
       } else {
         const anoAnuidade = Number(campos.ano.value);
+        if (tipo === 'anuidade_cnkb' && anoAnuidade === 2027 && data >= '2026-12-01') {
+          throw new Error('Use a seção CNKB 2027 para indicar quem recebeu o pagamento.');
+        }
         const { data: cobrancas, error: erroCobrancas } = await sb.from('pag_v_cobrancas')
           .select('valor_pago').eq('atleta_id', atleta.id).eq('tipo', tipo)
           .eq('ano', anoAnuidade).eq('cancelada', false);

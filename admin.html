@@ -69,6 +69,7 @@
   <nav aria-label="Acessos da Presidência" class="mt-4 flex flex-wrap gap-2 text-sm">
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-agenda">Agenda e responsabilidades</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-anuidades">Confirmar anuidades</a>
+    <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-descontos">Autorizar descontos 2027</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-midias">Central de Mídias</a>
     <a class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800" href="#presidencia-segundo-cerebro">Segundo Cérebro</a>
     <button type="button" onclick="abrirRanking()" class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800">Ver ranking publicado</button>
@@ -246,6 +247,17 @@
   <ol id="listaAnuidadesPresidencia" class="max-h-64 overflow-auto"></ol>
   <button type="button" id="confirmarAnuidadesPresidencia" hidden class="mt-3 rounded bg-sky-700 p-2">Confirmar pela Presidência</button>
 </details>
+<details id="presidencia-descontos" class="my-4 rounded-xl border border-gray-700 bg-gray-900 p-4 text-white">
+  <summary>Financeiro · Autorizar desconto de arbitragem e mesa 2027</summary>
+  <form id="autorizarDesconto2027" class="mt-3 grid gap-3">
+    <label>Matrícula <input name="registro" type="number" min="1" required class="inp"></label>
+    <label>Etapa final <select name="final" required class="inp"><option value="">Selecione a etapa final</option></select></label>
+    <label>Justificativa da conferência <textarea name="justificativa" required maxlength="500" class="inp"></textarea></label>
+    <button type="submit" disabled class="justify-self-start rounded bg-sky-700 p-2 disabled:opacity-50">Autorizar desconto</button>
+    <p role="status"></p>
+  </form>
+</details>
+<section id="financeiroProcessosRegistro2027"></section>
 <details id="presidencia-ranking" class="my-4 rounded border border-gray-700 p-4 text-white">
   <summary>Resultados e ranking · Conferir histórico</summary>
   <p class="my-2"><button type="button" onclick="abrirRanking()" class="rounded-lg border border-slate-600 px-3 py-2 text-sky-200 hover:bg-slate-800">Ver ranking publicado</button></p>
@@ -777,6 +789,10 @@
     }
     import('./financeiro-cobrancas.js').then(({ iniciarCobrancas }) => iniciarCobrancas(sb, () => atletas))
       .catch(() => { $('statusCobrancaPortal').textContent = 'Não foi possível abrir o formulário de cobranças.'; });
+    import('./financeiro-processos.js').then(({ iniciarProcessosRegistro2027 }) => iniciarProcessosRegistro2027(sb, () => atletas)).catch(() => { $('financeiroProcessosRegistro2027').textContent = 'Não foi possível abrir os processos Dan e Dangai.'; });
+    import('./financeiro-cnkb.js').then(({ iniciarCnkb2027 }) => iniciarCnkb2027(sb, () => atletas))
+      .catch(() => { $('statusPagamentoPortal').textContent = 'Não foi possível abrir o módulo CNKB.'; });
+    import('./financeiro-descontos.js').then(({ iniciarDescontos2027 }) => iniciarDescontos2027(sb, () => atletas));
     import('./financeiro-pagamentos.js').then(({ iniciarPagamentos }) => iniciarPagamentos(sb, () => atletas))
       .catch(() => { $('statusPagamentoPortal').textContent = 'Não foi possível abrir o módulo de pagamentos.'; });
     const ativo = a => /202[67]/.test(String(a.anuidade));
@@ -2152,4 +2168,3 @@ São usados os atletas que estão na lista da tela (respeita os filtros). Acima 
   </script>
 </body>
 </html>
-

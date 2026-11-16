@@ -28,7 +28,12 @@ function dataFormatada(valor) {
 function tipoExibido(cobranca, eventos) {
   const evento = eventos.get(String(cobranca.evento_id));
   if (evento) return evento.tipo === 'curso' ? 'Curso' : 'Evento';
-  const tipos = { fikarj: 'Anuidade FIKARJ', cnkb: 'Anuidade CNKB' };
+  const tipos = {
+    anuidade_fikarj: 'Anuidade FIKARJ', anuidade_cnkb: 'Anuidade CNKB',
+    fikarj: 'Anuidade FIKARJ', cnkb: 'Anuidade CNKB', exame_dan: 'Exame Dan',
+    registro_dan: 'Registro Dan', reconhecimento_dan: 'Reconhecimento Dan',
+    registro_dangai: 'Registro Dangai', diploma_dangai: 'Diploma Dangai',
+  };
   return tipos[cobranca.tipo] || cobranca.tipo || 'Outro';
 }
 
@@ -36,27 +41,57 @@ async function carregarTudo(sb) {
   const consultas = await Promise.all([
     sb.from('pag_eventos').select('id,nome,tipo,data').order('data', { ascending: false }),
     carregarCobrancas(sb),
+    carregarPaginado(() => sb.from('pag_v_movimentos_caixa')
+      .select('movimento_id,pagamento_id,cobranca_id,natureza,data,valor,forma')
+      .order('data').order('natureza').order('movimento_id')),
+    carregarPaginado(() => sb.from('pag_v_cnkb_operacoes_2027')
+      .select('id,atleta_id,ano,modalidade,valor,data_pagamento,conferencia,repasse_data,confirmacao_data,situacao').order('id')),
+    carregarPaginado(() => sb.from('pag_v_anuidades_inclusas_2027')
+      .select('atleta_id,ano,tipo,cobranca_id,status').order('cobranca_id').order('tipo')),
+    carregarPaginado(() => sb.from('pag_v_anuidades_2027')
+      .select('atleta_id,registro,nome,associacao,categoria').order('atleta_id')),
+    carregarPaginado(() => sb.from('associacoes').select('sigla,nome').order('sigla')),
   ]);
-  const [eventosResposta, cobrancas] = consultas;
+  const [eventosResposta, cobrancas, movimentos, cnkb, inclusoes, atletas, associacoes] = consultas;
   if (eventosResposta.error) throw eventosResposta.error;
   return {
     eventos: new Map((eventosResposta.data || []).map(evento => [String(evento.id), evento])),
-    cobrancas,
+    cobrancas, movimentos, cnkb, inclusoes, atletas, associacoes,
   };
 }
 
-async function carregarCobrancas(sb) {
+function carregarCobrancas(sb) {
+  return carregarPaginado(() => sb.from('pag_v_cobrancas')
+    .select('id,atleta_id,tipo,ano,evento_id,descricao,valor_final,vencimento,cancelada,criado_em,atleta_nome,associacao,valor_pago,saldo,status,ultimo_pagamento')
+    .order('criado_em', { ascending: false })
+    .order('id', { ascending: false }));
+}
+
+async function carregarPaginado(consulta) {
   const resultado = [];
   for (let inicio = 0; ; inicio += LIMITE_PAGINA) {
-    const { data, error } = await sb.from('pag_v_cobrancas')
-      .select('id,atleta_id,tipo,ano,evento_id,descricao,valor_final,vencimento,cancelada,criado_em,atleta_nome,associacao,valor_pago,saldo,status,ultimo_pagamento')
-      .order('criado_em', { ascending: false })
-      .order('id', { ascending: false })
-      .range(inicio, inicio + LIMITE_PAGINA - 1);
+    const { data, error } = await consulta().range(inicio, inicio + LIMITE_PAGINA - 1);
     if (error) throw error;
     resultado.push(...(data || []));
     if (!data || data.length < LIMITE_PAGINA) return resultado;
   }
+}
+
+export function codificarFinanceiroCsv(linhas) {
+  return '\uFEFF' + linhas.map(linha => linha.map(valor => {
+    let texto = String(valor ?? '');
+    if (typeof valor === 'string' && /^[\s\uFEFF]*[=+@-]|^[\t\r\n]/u.test(texto)) texto = "'" + texto;
+    return '"' + texto.replaceAll('"', '""') + '"';
+  }).join(';')).join('\r\n');
+}
+
+function baixarCsv(nome, linhas) {
+  const url = URL.createObjectURL(new Blob([codificarFinanceiroCsv(linhas)], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nome;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function iniciarVisaoFinanceira(sb, container) {
@@ -79,10 +114,11 @@ export function iniciarVisaoFinanceira(sb, container) {
         <label class="grid gap-1 text-sm">Evento ou curso
           <select data-filtro="evento" class="max-w-xs rounded border border-gray-500 bg-slate-900 px-3 py-2 text-white"><option value="">Todos</option></select>
         </label>
-        <label class="grid gap-1 text-sm">Ano
+        <label class="grid gap-1 text-sm">Competência
           <select data-filtro="ano" class="rounded border border-gray-500 bg-slate-900 px-3 py-2 text-white"><option value="">Todos</option></select>
         </label>
         <button type="button" data-acao="atualizar" class="rounded bg-sky-700 px-4 py-2 font-semibold text-white hover:bg-sky-600">Atualizar</button>
+        <button type="button" data-acao="csv-competencia" disabled class="rounded border border-slate-600 px-3 py-2">Exportar cobranças (CSV)</button>
       </div>
 
       <p data-papel="status" role="status" aria-live="polite" class="text-sm text-slate-300">Abra a seção para consultar o financeiro.</p>
@@ -90,7 +126,7 @@ export function iniciarVisaoFinanceira(sb, container) {
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <article class="rounded border border-slate-700 bg-slate-900 p-3"><p class="text-xs text-slate-300">Cobranças ativas</p><strong data-total="quantidade" class="text-xl">—</strong></article>
         <article class="rounded border border-slate-700 bg-slate-900 p-3"><p class="text-xs text-slate-300">Valor lançado</p><strong data-total="lancado" class="text-xl">—</strong></article>
-        <article class="rounded border border-slate-700 bg-slate-900 p-3"><p class="text-xs text-slate-300">Recebido</p><strong data-total="recebido" class="text-xl">—</strong></article>
+        <article class="rounded border border-slate-700 bg-slate-900 p-3"><p class="text-xs text-slate-300">Pagamentos lançados na competência</p><strong data-total="recebido" class="text-xl">—</strong></article>
         <article class="rounded border border-slate-700 bg-slate-900 p-3"><p class="text-xs text-slate-300">Em aberto</p><strong data-total="aberto" class="text-xl">—</strong></article>
         <article class="rounded border border-slate-700 bg-slate-900 p-3"><p class="text-xs text-slate-300">Saldo vencido</p><strong data-total="vencido" class="text-xl">—</strong></article>
       </div>
@@ -107,6 +143,34 @@ export function iniciarVisaoFinanceira(sb, container) {
         <span data-papel="contagem" class="text-slate-300"></span>
         <div class="flex gap-2"><button type="button" data-acao="anterior" class="rounded border border-slate-600 px-3 py-1 disabled:opacity-40">Anterior</button><button type="button" data-acao="proxima" class="rounded border border-slate-600 px-3 py-1 disabled:opacity-40">Próxima</button></div>
       </div>
+      <details class="rounded border border-slate-700 p-3">
+        <summary>Movimentos registrados por data de caixa</summary>
+        <div class="my-3 flex flex-wrap items-end gap-3">
+          <label class="grid gap-1 text-sm">Ano de caixa
+            <select data-filtro="caixa" class="rounded border border-gray-500 bg-slate-900 px-3 py-2 text-white"><option value="">Todos</option></select>
+          </label>
+          <button type="button" data-acao="csv-caixa" disabled class="rounded border border-slate-600 px-3 py-2">Exportar movimentos (CSV)</button>
+        </div>
+        <p data-papel="caixa" class="text-sm" aria-live="polite">—</p>
+        <p class="mt-2 text-sm text-slate-300">Este quadro considera pagamentos e estornos registrados. Valores vinculados a CNKB e Dan aparecem agrupados para conferência.</p>
+      </details>
+      <details class="rounded border border-slate-700 p-3">
+        <summary>Operações CNKB, anuidades incluídas e alvarás</summary>
+        <div class="my-3 flex flex-wrap gap-2">
+          <button type="button" data-acao="csv-cnkb" disabled class="rounded border border-slate-600 px-3 py-2">Exportar operações CNKB (CSV)</button>
+          <button type="button" data-acao="csv-inclusoes" disabled class="rounded border border-slate-600 px-3 py-2">Exportar anuidades incluídas (CSV)</button>
+          <button type="button" data-acao="csv-alvaras" disabled class="rounded border border-slate-600 px-3 py-2">Exportar conferência dos alvarás (CSV)</button>
+        </div>
+        <p data-papel="cnkb" class="my-2 text-sm" aria-live="polite">—</p>
+        <p class="mt-2 text-sm text-slate-300">O relatório de alvarás usa a evidência financeira disponível de 2026 e 2027. Pendências podem refletir ausência de dados. A conferência e a emissão cabem à administração.</p>
+        <div class="mt-2 overflow-x-auto">
+          <table class="min-w-full text-left text-sm">
+            <thead><tr><th class="p-2">Associação</th><th class="p-2">Faixas pretas</th><th class="p-2">FIKARJ 2026 comprovada*</th><th class="p-2">CNKB 2026 registrada*</th><th class="p-2">Coloridas em dia 2027</th><th class="p-2">Conferência</th></tr></thead>
+            <tbody data-papel="alvaras"></tbody>
+          </table>
+        </div>
+        <p class="mt-2 text-xs text-slate-300">* Entre faixas pretas vinculadas, conforme cobranças registradas no Financeiro. A regularidade junto à CNKB exige confirmação administrativa.</p>
+      </details>
     </section>`;
 
   const campo = nome => container.querySelector(`[data-filtro="${nome}"]`);
@@ -115,7 +179,7 @@ export function iniciarVisaoFinanceira(sb, container) {
   const botaoAnterior = container.querySelector('[data-acao="anterior"]');
   const botaoProxima = container.querySelector('[data-acao="proxima"]');
   const paginaEl = container.querySelector('[data-papel="contagem"]');
-  let dados = { cobrancas: [], eventos: new Map() };
+  let dados = { cobrancas: [], movimentos: [], cnkb: [], inclusoes: [], atletas: [], associacoes: [], eventos: new Map() };
   let pagina = 0;
   let carregada = false;
   let emCurso = false;
@@ -140,8 +204,75 @@ export function iniciarVisaoFinanceira(sb, container) {
     });
   }
 
+  function filtrarCaixa(cobrancas) {
+    const porId = new Map(cobrancas.map(c => [String(c.id), c]));
+    const anoCaixa = campo('caixa').value;
+    return dados.movimentos.flatMap(movimento => {
+      const cobranca = porId.get(String(movimento.cobranca_id));
+      if (!cobranca || (anoCaixa && movimento.data?.slice(0, 4) !== anoCaixa)) return [];
+      return [{ movimento, cobranca }];
+    });
+  }
+
+  function conferenciasAlvaras() {
+    const pagas = new Set(dados.cobrancas.filter(item => !item.cancelada && item.status === 'pago')
+      .map(item => `${item.atleta_id}:${item.ano}:${item.tipo}`));
+    const incluidas = new Set(dados.inclusoes.filter(item =>
+      item.tipo === 'anuidade_fikarj' && item.status === 'quitada_por_inclusao')
+      .map(item => `${item.atleta_id}:${item.ano}:${item.tipo}`));
+    const atletas = new Map(dados.atletas.map(item => [String(item.atleta_id), item]));
+    return dados.associacoes.map(associacao => {
+      const vinculados = [...atletas.values()].filter(item => item.associacao === associacao.sigla);
+      const pretas = vinculados.filter(item => item.categoria === 'preta');
+      const cor = vinculados.filter(item => ['kyu_10_2', '1kyu'].includes(item.categoria));
+      const fikarj = pretas.filter(item => pagas.has(`${item.atleta_id}:2026:anuidade_fikarj`)).length;
+      const cnkb = pretas.filter(item => pagas.has(`${item.atleta_id}:2026:anuidade_cnkb`)).length;
+      const coloridas = cor.filter(item => {
+        const chave = `${item.atleta_id}:2027:anuidade_fikarj`;
+        return pagas.has(chave) || incluidas.has(chave);
+      }).length;
+      const pendencias = [
+        ...(coloridas < 15 ? [`Faltam ${15 - coloridas} coloridas com quitação registrada`] : []),
+        ...(fikarj < pretas.length ? ['Conferir FIKARJ 2026'] : []),
+        ...(cnkb < pretas.length ? ['Conferir pagamentos CNKB 2026'] : []),
+        ...(pretas.length ? ['Confirmar filiação e regularidade CNKB'] : ['Validar quadro de faixas pretas']),
+        ...(vinculados.some(item => !item.categoria) ? ['Conferir graduação no cadastro'] : []),
+      ];
+      return [associacao.nome, pretas.length, fikarj, cnkb, coloridas, pendencias.join(' · ')];
+    });
+  }
+
+  function renderizarComplementos() {
+    const ano = campo('ano').value;
+    const operacoes = dados.cnkb.filter(item => !ano || String(item.ano) === ano);
+    const ativos = operacoes.filter(item => !['cancelada', 'estornada'].includes(item.situacao));
+    const diretos = ativos.filter(item => item.modalidade === 'direto' && item.conferencia);
+    const aRepassar = ativos.filter(item => item.situacao === 'aguardando_repasse');
+    const repassados = ativos.filter(item => item.repasse_data);
+    const total = itens => reais(itens.reduce((soma, item) => soma + centavos(item.valor), 0) / 100);
+    container.querySelector('[data-papel="cnkb"]').textContent =
+      `Direto à CNKB conferido: ${total(diretos)} · A repassar: ${total(aRepassar)} · Repassado: ${total(repassados)} · ${ativos.filter(item => item.situacao === 'aguardando_conferencia').length} aguardando conferência`;
+    container.querySelector('[data-acao="csv-cnkb"]').disabled = !operacoes.length;
+    container.querySelector('[data-acao="csv-inclusoes"]').disabled = !dados.inclusoes.some(item => !ano || String(item.ano) === ano);
+    const alvaras = conferenciasAlvaras();
+    container.querySelector('[data-acao="csv-alvaras"]').disabled = !alvaras.length;
+    container.querySelector('[data-papel="alvaras"]').innerHTML = alvaras.map(linha =>
+      '<tr>' + linha.map(valor => `<td class="p-2">${escapar(valor)}</td>`).join('') + '</tr>').join('');
+  }
+
   function renderizar() {
     const filtradas = filtrar();
+    const caixa = filtrarCaixa(filtradas);
+    const saldoPorGrupo = caixa.reduce((totais, { movimento, cobranca }) => {
+      const tipo = tipoExibido(cobranca, dados.eventos);
+      const grupo = tipo === 'Anuidade CNKB' ? 'cnkb' : /Dan$/.test(tipo) ? 'dan' : 'institucional';
+      totais[grupo] += centavos(movimento.valor);
+      return totais;
+    }, { cnkb: 0, dan: 0, institucional: 0 });
+    container.querySelector('[data-papel="caixa"]').textContent =
+      `${caixa.length} movimentos · FIKARJ: ${reais(saldoPorGrupo.institucional / 100)} · CNKB: ${reais(saldoPorGrupo.cnkb / 100)} · Processos Dan: ${reais(saldoPorGrupo.dan / 100)}`;
+    container.querySelector('[data-acao="csv-competencia"]').disabled = !filtradas.length;
+    container.querySelector('[data-acao="csv-caixa"]').disabled = !caixa.length;
     const ativos = filtradas.filter(c => !c.cancelada && c.status !== 'cancelada');
     const totais = {
       quantidade: ativos.length.toLocaleString('pt-BR'),
@@ -186,11 +317,12 @@ export function iniciarVisaoFinanceira(sb, container) {
   function preencherFiltros() {
     const tipos = [...new Set(dados.cobrancas.map(c => tipoExibido(c, dados.eventos)))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     const eventos = [...dados.eventos.values()].sort((a, b) => `${a.nome} ${a.data}`.localeCompare(`${b.nome} ${b.data}`, 'pt-BR'));
-    const anos = [...new Set(dados.cobrancas.map(c => String(c.ano || dados.eventos.get(String(c.evento_id))?.data?.slice(0, 4) || '')).filter(Boolean))].sort().reverse();
+    const anos = [...new Set([2026, 2027].map(String).concat(dados.cobrancas.map(c => String(c.ano || dados.eventos.get(String(c.evento_id))?.data?.slice(0, 4) || '')).filter(Boolean)))].sort().reverse();
     for (const [nome, valores, valueOf, labelOf] of [
       ['tipo', tipos, value => value, value => value],
       ['evento', eventos, value => value.id, value => `${value.nome} · ${dataFormatada(value.data)}`],
       ['ano', anos, value => value, value => value],
+      ['caixa', [...new Set(dados.movimentos.map(item => item.data?.slice(0, 4)).filter(Boolean))].sort().reverse(), value => value, value => value],
     ]) {
       const select = campo(nome);
       const selecionado = select.value;
@@ -213,6 +345,7 @@ export function iniciarVisaoFinanceira(sb, container) {
       carregada = true;
       preencherFiltros();
       renderizar();
+      renderizarComplementos();
       statusEl.textContent = `Atualizado em ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date())}.`;
     } catch (erro) {
       if (pedido === pedidoAtual) statusEl.textContent = erro?.message || 'Não foi possível carregar a visão financeira.';
@@ -222,11 +355,51 @@ export function iniciarVisaoFinanceira(sb, container) {
     }
   }
 
+  campo('ano').addEventListener('change', renderizarComplementos);
+  const pessoaPorId = id => dados.atletas.find(item => String(item.atleta_id) === String(id));
+  const daCompetencia = item => !campo('ano').value || String(item.ano) === campo('ano').value;
+  container.querySelector('[data-acao="csv-cnkb"]').addEventListener('click', () => {
+    baixarCsv('fikarj-operacoes-cnkb.csv', [
+      ['Competência', 'Matrícula', 'Modalidade', 'Valor (BRL)', 'Data de pagamento', 'Conferência', 'Repasse', 'Confirmação CNKB', 'Situação'],
+      ...dados.cnkb.filter(daCompetencia).map(item => [item.ano, pessoaPorId(item.atleta_id)?.registro, item.modalidade,
+        Number(item.valor), item.data_pagamento, item.conferencia, item.repasse_data, item.confirmacao_data, item.situacao]),
+    ]);
+  });
+  container.querySelector('[data-acao="csv-inclusoes"]').addEventListener('click', () => {
+    baixarCsv('fikarj-anuidades-incluidas.csv', [
+      ['Competência', 'Matrícula', 'Obrigação', 'Cobrança de origem', 'Situação'],
+      ...dados.inclusoes.filter(daCompetencia).map(item => [item.ano, pessoaPorId(item.atleta_id)?.registro,
+        tipoExibido(item, dados.eventos), item.cobranca_id, item.status]),
+    ]);
+  });
+  container.querySelector('[data-acao="csv-alvaras"]').addEventListener('click', () => {
+    baixarCsv('fikarj-conferencia-alvaras.csv', [
+      ['Associação', 'Faixas pretas', 'FIKARJ 2026 registrada', 'CNKB 2026 registrada', 'Coloridas em dia 2027', 'Conferência'],
+      ...conferenciasAlvaras(),
+    ]);
+  });
+
   for (const controle of container.querySelectorAll('[data-filtro]')) {
     controle.addEventListener('input', () => { pagina = 0; renderizar(); });
     controle.addEventListener('change', () => { pagina = 0; renderizar(); });
   }
   container.querySelector('[data-acao="atualizar"]').addEventListener('click', atualizar);
+  container.querySelector('[data-acao="csv-competencia"]').addEventListener('click', () => {
+    baixarCsv('fikarj-cobrancas.csv', [
+      ['Competência', 'Filiado', 'Associação', 'Tipo', 'Descrição', 'Vencimento', 'Situação', 'Devido (BRL)', 'Pago (BRL)', 'Saldo (BRL)'],
+      ...filtrar().map(c => [c.ano, c.atleta_nome, c.associacao, tipoExibido(c, dados.eventos),
+        c.descricao, c.vencimento, STATUS[c.status] ?? c.status, Number(c.valor_final), Number(c.valor_pago), Number(c.saldo)]),
+    ]);
+  });
+  container.querySelector('[data-acao="csv-caixa"]').addEventListener('click', () => {
+    baixarCsv('fikarj-movimentos-caixa.csv', [
+      ['Data de caixa', 'Competência', 'Natureza', 'Filiado', 'Associação', 'Tipo', 'Descrição', 'Forma', 'Valor (BRL)'],
+      ...filtrarCaixa(filtrar()).map(({ movimento, cobranca: c }) => [
+        movimento.data, c.ano, movimento.natureza, c.atleta_nome, c.associacao, tipoExibido(c, dados.eventos),
+        c.descricao, movimento.forma, Number(movimento.valor),
+      ]),
+    ]);
+  });
   botaoAnterior.addEventListener('click', () => { pagina = Math.max(0, pagina - 1); renderizar(); });
   botaoProxima.addEventListener('click', () => { pagina++; renderizar(); });
 
