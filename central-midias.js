@@ -212,7 +212,17 @@ export function iniciarCentralMidias(sb) {
         }
       }));
       if (['rascunho', 'planejado', 'aprovado', 'agendado'].includes(item.status)) li.append(botao('Cancelar item', () => {
-        if (window.confirm('Cancelar este conteúdo?')) transicionar(item, 'cancelar', 'Conteúdo cancelado.');
+        if (li.querySelector('[data-confirmar-cancelamento]')) return;
+        const confirmar = document.createElement('div');
+        confirmar.dataset.confirmarCancelamento = '';
+        confirmar.setAttribute('role', 'group');
+        confirmar.setAttribute('aria-label', 'Confirmar cancelamento');
+        const aviso = document.createElement('p');
+        aviso.textContent = 'Cancelar este conteúdo? O histórico será preservado.';
+        confirmar.append(aviso,
+          botao('Confirmar cancelamento', () => transicionar(item, 'cancelar', 'Conteúdo cancelado.')),
+          botao('Manter item', () => confirmar.remove()));
+        li.append(confirmar);
       }));
     }
     for (const lista of [calendario, rascunhos]) {
