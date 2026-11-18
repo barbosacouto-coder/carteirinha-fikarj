@@ -335,6 +335,7 @@
         <button id="criarProtocolo" class="justify-self-start rounded bg-sky-600 px-4 py-2 font-semibold" type="submit">Criar rascunho e reservar protocolo</button>
         <p id="resultadoProtocolo" role="status" aria-live="polite"></p>
       </form>
+      <div id="secretariaLotes" class="mt-5 grid gap-2 border-t border-gray-700 pt-4 text-gray-100"></div>
       <form id="formLoteProtocolo" class="mt-5 grid gap-2 border-t border-gray-700 pt-4 text-gray-100">
         <h3 class="font-bold">Certificados em lote</h3>
         <label>Assunto <input id="assuntoLoteProtocolo" required maxlength="240" class="block w-full rounded bg-gray-800 p-2"></label>
@@ -1381,6 +1382,8 @@ $('backupRankingCentral').addEventListener('change',async event=>{
       abrirSecaoPresidencia();
       await Promise.all([
         carregar(),
+        import('./secretaria-lotes.js?v=1').then(({ iniciarSecretariaLotes }) => iniciarSecretariaLotes(sb))
+          .catch(() => { $('secretariaLotes').textContent = 'Não foi possível abrir os documentos em lote. Atualize a página para tentar novamente.'; }),
         (moduloPresidencia ??= import('./presidencia-visao.js')).then(({ iniciarVisaoPresidencia }) => iniciarVisaoPresidencia(sb))
           .catch(() => { $('presidenciaStatus').textContent = 'Indicadores indisponíveis. As áreas operacionais continuam acessíveis.'; }),
         (moduloAgenda ??= import('./agenda-institucional.js')).then(({ iniciarAgendaInstitucional }) => iniciarAgendaInstitucional(sb))
